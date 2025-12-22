@@ -63,6 +63,10 @@ class VideoAnimationBuilder:
     def _create_animation_frames(self, word: str, start: float, end: float, pose_id: str) -> List[Dict]:
         """
         Creates frames alternating between open and closed mouth for each syllable.
+        
+        Uses intelligent speed control to prevent unnatural rapid mouth movements:
+        - Minimum syllable duration threshold prevents "rapper" effect
+        - Fast words get reduced effective syllable count for smoother animation
         """
         if not word:
             return []
@@ -76,16 +80,32 @@ class VideoAnimationBuilder:
         if duration <= 0:
             return []
 
-        syllables = self._count_syllables(word)
+        # === SPEED CONTROL LOGIC ===
+        # Minimum time per syllable cycle to look natural (in seconds)
+        # 100ms = 10 open/close cycles per second max
+        MIN_SYLLABLE_DURATION = 0.10
+        
+        raw_syllables = self._count_syllables(word)
+        
+        # Calculate effective syllables based on word duration
+        # If speaking too fast, reduce syllable count to prevent rapid animation
+        max_syllables_for_duration = max(1, int(duration / MIN_SYLLABLE_DURATION))
+        effective_syllables = min(raw_syllables, max_syllables_for_duration)
+        
+        # For very short words (< 80ms), just hold mouth open
+        if duration < 0.08:
+            effective_syllables = 1
+        
         FPS = 30
         num_frames = max(1, int(duration * FPS))
         
         frames = []
-        frames_per_syllable = num_frames / syllables
+        frames_per_syllable = num_frames / effective_syllables
         
         for i in range(num_frames):
             frame_time = start + (i / FPS)
             progress_in_syllable = (i % frames_per_syllable) / frames_per_syllable
+            # Open mouth for first 50% of each syllable cycle
             is_open = progress_in_syllable < 0.5
             
             img_path = pose_data["open"] if is_open else pose_data["closed"]

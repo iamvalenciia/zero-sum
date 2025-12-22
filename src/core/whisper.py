@@ -7,7 +7,7 @@ from pathlib import Path
 import ctypes.util
 import platform
 import difflib
-import re
+import re 
 from typing import List, Dict, Optional
 
 # Fix for Whisper on Windows
@@ -389,14 +389,16 @@ def align_transcript_with_script(
                     min_match_len=2
                 )
         
-        # C. Decide the best boundary
-        if current_end_candidate != -1 and current_end_candidate > segment_start_idx:
-            # Prefer end-of-current match
-            segment_end_idx = current_end_candidate
-            print(f"   Seg {i}: End found via current segment's last words at index {segment_end_idx}")
-        elif next_start_candidate != -1 and next_start_candidate > segment_start_idx:
+        # C. Decide the best boundary - PRIORITY: next segment start
+        # This ensures no words are orphaned between segments
+        if next_start_candidate != -1 and next_start_candidate > segment_start_idx:
+            # ALWAYS prefer next segment's start as the boundary
             segment_end_idx = next_start_candidate
             print(f"   Seg {i}: End found via next segment's start at index {segment_end_idx}")
+        elif current_end_candidate != -1 and current_end_candidate > segment_start_idx:
+            # Fallback: use end-of-current match
+            segment_end_idx = current_end_candidate
+            print(f"   Seg {i}: End found via current segment's last words at index {segment_end_idx}")
         else:
             # Use proportional estimate
             segment_end_idx = max(segment_start_idx + 1, expected_end)
