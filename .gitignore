@@ -1,0 +1,6 @@
+.env
+__pycache__
+.venv
+# Large video files
+data/output/*.mp4
+old-videos/**/*.mp4

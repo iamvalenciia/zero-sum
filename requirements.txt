@@ -1,0 +1,29 @@
+# Audio & Speech
+openai-whisper
+elevenlabs
+num2words
+
+# AI & LLM Clients
+anthropic
+google-genai
+openai
+
+# Image & Video Processing
+Pillow
+moviepy
+av
+rembg
+cairosvg
+svglib
+reportlab
+playwright
+
+# Data & Finance
+yfinance
+matplotlib
+numpy
+pandas
+requests
+
+# Utilities
+python-dotenv

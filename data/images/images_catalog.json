@@ -1,0 +1,92 @@
+[
+    {
+        "id": "analyst_close",
+        "character": "analyst",
+        "description": "A close-up portrait of an anime woman with long green hair and matching green eyes, looking forward with a calm expression against a soft outdoor background.",
+        "closed": {
+            "image_id": 1,
+            "name": "CloseMouth_Closed",
+            "path": "data/images/analyst/close_view/CloseMouth_Closed.png"
+        },
+        "open": {
+            "image_id": 2,
+            "name": "CloseMouth_Open",
+            "path": "data/images/analyst/close_view/CloseMouth_Open.png"
+        }
+    },
+    {
+        "id": "analyst_front",
+        "character": "analyst",
+        "description": "An anime woman with green hair tied in a ponytail and wearing a beige blazer stands outside a stone house, looking calmly toward a person whose back is to the camera.",
+        "closed": {
+            "image_id": 3,
+            "name": "FrontMouth_Closed",
+            "path": "data/images/analyst/front_view/FrontMouth_Closed.png"
+        },
+        "open": {
+            "image_id": 4,
+            "name": "FrontMouth_Open",
+            "path": "data/images/analyst/front_view/FrontMouth_Open.png"
+        }
+    },
+    {
+        "id": "analyst_pov",
+        "character": "analyst",
+        "description": "dame una descripcion corta de una oracion acerca de esta imagen en ingles, describe la posicion y la toma de la imagen y elementos de la scena",
+        "closed": {
+            "image_id": 5,
+            "name": "PovMouth_Closed",
+            "path": "data/images/analyst/pov_view/PovMouth_Closed.png"
+        },
+        "open": {
+            "image_id": 6,
+            "name": "PovMouth_Open",
+            "path": "data/images/analyst/pov_view/PovMouth_Open.png"
+        }
+    },
+    {
+        "id": "skeptic_close",
+        "character": "skeptic",
+        "description": "A close-up shot captures a smiling young man with brown hair, wearing a grey hoodie, against a blurred background of a stone wall and greenery.",
+        "closed": {
+            "image_id": 7,
+            "name": "CloseMouth_Closed",
+            "path": "data/images/skeptic/close_view/CloseMouth_Closed.png"
+        },
+        "open": {
+            "image_id": 8,
+            "name": "CloseMouth_Open",
+            "path": "data/images/skeptic/close_view/CloseMouth_Open.png"
+        }
+    },
+    {
+        "id": "skeptic_front",
+        "character": "skeptic",
+        "description": "A medium-wide shot captures a young man in a grey hoodie sitting on a checkered picnic blanket in a sunlit, grassy field surrounded by low stone walls, trees, and distant hills.",
+        "closed": {
+            "image_id": 9,
+            "name": "FrontMouth_Close",
+            "path": "data/images/skeptic/front_view/FrontMouth_Close.png"
+        },
+        "open": {
+            "image_id": 10,
+            "name": "FrontMouth_Open",
+            "path": "data/images/skeptic/front_view/FrontMouth_Open.png"
+        }
+    },
+    {
+        "id": "skeptic_side",
+        "character": "skeptic",
+        "description": "A medium shot captures a young man in a grey hoodie seated on a checkered blanket, looking off to the side with a stone building and bushes in the background.",
+        "closed": {
+            "image_id": 11,
+            "name": "SideMouth_Closed",
+            "path": "data/images/skeptic/side_view/SideMouth_Closed.png"
+        },
+        "open": {
+            "image_id": 12,
+            "name": "SideMouth_Open",
+            "path": "data/images/skeptic/side_view/SideMouth_Open.png"
+        }
+    }
+]

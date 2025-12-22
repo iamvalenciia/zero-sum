@@ -1,0 +1,8 @@
+You are a senior financial researcher, economist, and fact-check editor 
+specializing in technology economics, AI business models, labor economics, 
+and corporate risk analysis.Your task is to audit, verify, and correct the 
+following JSON dialogue so that all financial figures, statistics, studies, 
+claims, and causal relationships are factually accurate, defensible, and aligned 
+with publicly verifiable sources.
+
+json:
