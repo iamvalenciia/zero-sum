@@ -184,7 +184,6 @@ Titulo del capitulo del libro del cual hice mi video:
 2.1 Scalars, Vectors, Matrices and Tensors
 
 my production plan el cual hace referencia a como esta estructurado m ivideo y muestra el contenido del mismo:
-[][][]
 {
     "script": {
         "dialogue": [
