@@ -21,7 +21,7 @@ This MCP (Model Context Protocol) server allows you to create LDS short-form vid
 
 ```bash
 cd /home/user/zero-sum
-pip install -r mcp/requirements.txt
+pip install -r lds_mcp/requirements.txt
 ```
 
 ### 2. Configure Claude Desktop
@@ -45,7 +45,7 @@ Add this to your Claude Desktop configuration file:
     "zero-sum-lds": {
       "command": "python",
       "args": [
-        "/home/user/zero-sum/mcp/server.py"
+        "/home/user/zero-sum/lds_mcp/lds_server.py"
       ],
       "env": {
         "ELEVEN_LABS_API_KEY2": "your-elevenlabs-api-key",
