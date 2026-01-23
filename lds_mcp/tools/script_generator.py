@@ -1,6 +1,7 @@
 """
 Script Generator for LDS Short-Form Content
-Creates dialogue scripts featuring Sister Faith and Brother Marcus.
+Creates dialogue scripts featuring Analyst (knowledgeable) and Skeptic (curious learner).
+Character names match ElevenLabs voice mapping for correct audio generation.
 """
 
 import json
@@ -26,18 +27,21 @@ LDS_SCRIPT_PROMPT = """
     "Audience": "English-speaking members of The Church of Jesus Christ of Latter-day Saints seeking spiritual growth, understanding, and community. Primary markets: United States, Canada, UK, Australia.",
     "Persona": {{
       "Character_A": {{
-        "Name": "Sister Faith",
-        "Role": "The Knowledgeable Member",
-        "Traits": "Cites prophets, scriptures, and testimonies with precision. Warm, faithful, reverent. Uses ElevenLabs emotion tags: [softly], [reverently], [with conviction], [warmly], [smiling], [deep breath], [whispers].",
-        "Voice_Notes": "Professional female voice. Clear enunciation. Pacing should feel like a loving Sunday School teacher."
+        "Name": "Analyst",
+        "Role": "The Knowledgeable Scripture Scholar",
+        "Traits": "Studies scriptures deeply and cites prophets with precision. Warm, faithful, reverent. Uses ElevenLabs emotion tags: [softly], [reverently], [with conviction], [warmly], [smiling], [deep breath], [whispers].",
+        "Voice_Notes": "Professional female voice (Eve). Clear enunciation. Pacing should feel like a loving Sunday School teacher.",
+        "Voice_ID": "BZgkqPqms7Kj9ulSkVzn"
       }},
       "Character_B": {{
-        "Name": "Brother Marcus",
+        "Name": "Skeptic",
         "Role": "The Curious Learner",
-        "Traits": "Represents members seeking to understand doctrine better. Sincere questions, humble curiosity. Uses ElevenLabs emotion tags: [curious], [thoughtfully], [surprised], [realizing], [pondering], [nervous laugh], [sighs].",
-        "Voice_Notes": "Young male voice. Natural conversational tone. Occasional hesitation to show genuine seeking."
+        "Traits": "Represents members seeking to understand doctrine better. Asks sincere questions, humble curiosity. Uses ElevenLabs emotion tags: [curious], [thoughtfully], [surprised], [realizing], [pondering], [nervous laugh], [sighs].",
+        "Voice_Notes": "Young male voice (Charles). Natural conversational tone. Occasional hesitation to show genuine seeking.",
+        "Voice_ID": "S9GPGBaMND8XWwwzxQXp"
       }},
-      "Viewer_Experience": "Parasocial Connection. The viewer feels their questions are validated and they receive clear, faith-affirming answers. They feel like they're eavesdropping on a meaningful gospel conversation."
+      "Viewer_Experience": "Parasocial Connection. The viewer feels their questions are validated and they receive clear, faith-affirming answers. They feel like they're eavesdropping on a meaningful gospel conversation.",
+      "CRITICAL_NOTE": "Character names MUST be exactly 'Analyst' and 'Skeptic' in the dialogue JSON for correct voice mapping in audio generation."
     }},
     "Content_Guidelines": {{
       "Tone": "Always faith-promoting and positive about the Church",
@@ -47,7 +51,7 @@ LDS_SCRIPT_PROMPT = """
       "Relevance": "When connecting to current events, focus on eternal principles that transcend the news cycle"
     }},
     "Context": {{
-      "Structure": "Start 'In Media Res' (mid-conversation). No intros or greetings. Jump straight into a compelling question or observation from Brother Marcus.",
+      "Structure": "Start 'In Media Res' (mid-conversation). No intros or greetings. Jump straight into a compelling question or observation from Skeptic.",
       "Pacing": "Quick exchanges. Each response should be concise but impactful. Use ellipses '...' for natural pauses.",
       "Ending": "No goodbyes. End with a powerful testimony, scripture, or open reflection that invites the viewer to ponder and comment."
     }},
@@ -64,12 +68,12 @@ LDS_SCRIPT_PROMPT = """
         "Requirement": "Every dialogue object MUST include a 'character_poses' array.",
         "Timing": "Use 'start_word_index' and 'end_word_index' (0-indexed) to map poses to specific parts of the sentence. You can switch poses mid-sentence to reflect tone shifts.",
         "Poses_Available": [
-          {{ "id": "sister_faith_close", "character": "Sister Faith", "description": "Close-up. Sharing testimony, profound truths, whispering." }},
-          {{ "id": "sister_faith_front", "character": "Sister Faith", "description": "Medium shot. Standard teaching, explaining doctrine, neutral." }},
-          {{ "id": "sister_faith_pov", "character": "Sister Faith", "description": "POV shot from Brother Marcus perspective. Used when being asked a question." }},
-          {{ "id": "brother_marcus_close", "character": "Brother Marcus", "description": "Close-up. Realization, emotion, confusion, nervous laughter." }},
-          {{ "id": "brother_marcus_front", "character": "Brother Marcus", "description": "Medium shot. Asking questions, listening, general inquiries." }},
-          {{ "id": "brother_marcus_side", "character": "Brother Marcus", "description": "Side profile. Thinking, reflecting, hesitation, avoiding eye contact." }}
+          {{ "id": "analyst_close", "character": "Analyst", "description": "Close-up. Sharing testimony, profound truths, whispering." }},
+          {{ "id": "analyst_front", "character": "Analyst", "description": "Medium shot. Standard teaching, explaining doctrine, neutral." }},
+          {{ "id": "analyst_pov", "character": "Analyst", "description": "POV shot from Skeptic perspective. Used when being asked a question." }},
+          {{ "id": "skeptic_close", "character": "Skeptic", "description": "Close-up. Realization, emotion, confusion, nervous laughter." }},
+          {{ "id": "skeptic_front", "character": "Skeptic", "description": "Medium shot. Asking questions, listening, general inquiries." }},
+          {{ "id": "skeptic_side", "character": "Skeptic", "description": "Side profile. Thinking, reflecting, hesitation, avoiding eye contact." }}
         ]
       }},
       "Output_Structure": "Output ONLY valid JSON following the template below. No markdown text outside the JSON."
@@ -88,20 +92,20 @@ LDS_SCRIPT_PROMPT = """
         }},
         "dialogue": [
           {{
-            "character": "Brother Marcus",
+            "character": "Skeptic",
             "text": "[curious] ...but I have always wondered, why does this matter so much?",
             "character_poses": [
-              {{ "pose_id": "brother_marcus_front", "start_word_index": 0, "end_word_index": 6 }},
-              {{ "pose_id": "brother_marcus_close", "start_word_index": 7, "end_word_index": 12 }}
+              {{ "pose_id": "skeptic_front", "start_word_index": 0, "end_word_index": 6 }},
+              {{ "pose_id": "skeptic_close", "start_word_index": 7, "end_word_index": 12 }}
             ],
             "visual_assets": null
           }},
           {{
-            "character": "Sister Faith",
+            "character": "Analyst",
             "text": "[warmly] That is such a beautiful question... [softly] Let me share what President Nelson taught about this.",
             "character_poses": [
-              {{ "pose_id": "sister_faith_front", "start_word_index": 0, "end_word_index": 7 }},
-              {{ "pose_id": "sister_faith_close", "start_word_index": 8, "end_word_index": 17 }}
+              {{ "pose_id": "analyst_front", "start_word_index": 0, "end_word_index": 7 }},
+              {{ "pose_id": "analyst_close", "start_word_index": 8, "end_word_index": 17 }}
             ],
             "visual_assets": [
               {{
@@ -111,20 +115,20 @@ LDS_SCRIPT_PROMPT = """
             ]
           }},
           {{
-            "character": "Brother Marcus",
+            "character": "Skeptic",
             "text": "[realizing] So it is not about... [thoughtfully] it is about who we become.",
             "character_poses": [
-              {{ "pose_id": "brother_marcus_side", "start_word_index": 0, "end_word_index": 5 }},
-              {{ "pose_id": "brother_marcus_close", "start_word_index": 6, "end_word_index": 11 }}
+              {{ "pose_id": "skeptic_side", "start_word_index": 0, "end_word_index": 5 }},
+              {{ "pose_id": "skeptic_close", "start_word_index": 6, "end_word_index": 11 }}
             ],
             "visual_assets": null
           }},
           {{
-            "character": "Sister Faith",
+            "character": "Analyst",
             "text": "[with conviction] Exactly. [reverently] And that... that changes everything.",
             "character_poses": [
-              {{ "pose_id": "sister_faith_front", "start_word_index": 0, "end_word_index": 2 }},
-              {{ "pose_id": "sister_faith_close", "start_word_index": 3, "end_word_index": 7 }}
+              {{ "pose_id": "analyst_front", "start_word_index": 0, "end_word_index": 2 }},
+              {{ "pose_id": "analyst_close", "start_word_index": 3, "end_word_index": 7 }}
             ],
             "visual_assets": [
               {{
@@ -196,28 +200,36 @@ async def create_lds_script(
             "word_count_target": word_count
         },
         "characters": {
-            "sister_faith": {
-                "name": "Sister Faith",
-                "role": "The knowledgeable member who cites prophets, scriptures, testimonies",
+            "analyst": {
+                "name": "Analyst",
+                "role": "The knowledgeable scripture scholar who cites prophets, scriptures, testimonies",
                 "voice_id": "BZgkqPqms7Kj9ulSkVzn",
+                "voice_name": "Eve (professional female)",
                 "emotion_tags": ["[softly]", "[reverently]", "[with conviction]", "[warmly]", "[smiling]", "[deep breath]", "[whispers]"],
-                "poses": ["sister_faith_close", "sister_faith_front", "sister_faith_pov"]
+                "poses": ["analyst_close", "analyst_front", "analyst_pov"]
             },
-            "brother_marcus": {
-                "name": "Brother Marcus",
+            "skeptic": {
+                "name": "Skeptic",
                 "role": "The curious learner asking sincere questions",
                 "voice_id": "S9GPGBaMND8XWwwzxQXp",
+                "voice_name": "Charles (young male)",
                 "emotion_tags": ["[curious]", "[thoughtfully]", "[surprised]", "[realizing]", "[pondering]", "[nervous laugh]", "[sighs]"],
-                "poses": ["brother_marcus_close", "brother_marcus_front", "brother_marcus_side"]
+                "poses": ["skeptic_close", "skeptic_front", "skeptic_side"]
             }
         },
+        "character_note": "IMPORTANT: Use exactly 'Analyst' and 'Skeptic' as character names in the dialogue for correct voice mapping.",
         "generation_prompt": prompt,
         "instructions": """
 IMPORTANT: Generate ALL content in ENGLISH only.
 
+CRITICAL - CHARACTER NAMES FOR AUDIO:
+- Use EXACTLY 'Analyst' for the scripture scholar (female voice - Eve)
+- Use EXACTLY 'Skeptic' for the curious learner (male voice - Charles)
+- These names MUST match exactly for correct audio generation!
+
 To generate the script, Claude should:
 1. Use the topic and context provided
-2. Create a natural dialogue between Sister Faith and Brother Marcus
+2. Create a natural dialogue between Analyst and Skeptic
 3. Include accurate scripture references and prophet quotes
 4. Format the output as valid JSON matching the template in generation_prompt
 5. Include ElevenLabs emotion tags: [warmly], [reverently], [curious], [softly], [with conviction], etc.
@@ -233,16 +245,13 @@ Output Format Requirements:
 - NO DIGITS - write numbers as words (e.g., 'eighteen thirty' not '1830')
 - Include opening_visual with image_prompt and hook text overlay
 - Each dialogue line needs character_poses array with pose_id and word indices
+- Character names in dialogue MUST be 'Analyst' or 'Skeptic' exactly
 
 After generation, save the script to: data/shorts/scripts/{script_id}.json
 """,
-        "pose_mapping": {
-            "sister_faith_close": "analyst_close",
-            "sister_faith_front": "analyst_front",
-            "sister_faith_pov": "analyst_pov",
-            "brother_marcus_close": "skeptic_close",
-            "brother_marcus_front": "skeptic_front",
-            "brother_marcus_side": "skeptic_side"
+        "available_poses": {
+            "analyst": ["analyst_close", "analyst_front", "analyst_pov"],
+            "skeptic": ["skeptic_close", "skeptic_front", "skeptic_side"]
         },
         "visual_requirements": {
             "opening_visual": "REQUIRED - First frame before dialogue with hook text overlay",

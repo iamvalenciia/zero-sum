@@ -52,20 +52,22 @@ IMAGES_DIR = DATA_DIR / "images"
 SHORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Character configuration for LDS content
+# IMPORTANT: Character names must match exactly for ElevenLabs voice mapping
+# "Analyst" -> Eve (female), "Skeptic" -> Charles (male)
 CHARACTERS = {
-    "sister_faith": {
-        "name": "Sister Faith",
-        "role": "The knowledgeable member",
+    "analyst": {
+        "name": "Analyst",
+        "role": "The knowledgeable scripture scholar",
         "voice_id": "BZgkqPqms7Kj9ulSkVzn",  # Eve - professional female
-        "traits": "Cites prophets, scriptures, and testimonies. Calm, faithful, precise.",
-        "tags": "[softly], [reverently], [with conviction], [warmly]"
+        "traits": "Studies scriptures deeply, cites prophets and testimonies. Calm, faithful, precise.",
+        "tags": "[softly], [reverently], [with conviction], [warmly], [deep breath], [whispers]"
     },
-    "brother_marcus": {
-        "name": "Brother Marcus",
+    "skeptic": {
+        "name": "Skeptic",
         "role": "The curious learner",
         "voice_id": "S9GPGBaMND8XWwwzxQXp",  # Charles - young male
         "traits": "Asks sincere questions, represents members learning. Humble, curious.",
-        "tags": "[curious], [thoughtfully], [surprised], [realizing]"
+        "tags": "[curious], [thoughtfully], [surprised], [realizing], [pondering], [nervous laugh], [sighs]"
     }
 }
 
@@ -369,11 +371,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
         dialogue = script_json.get("script", {}).get("dialogue", [])
 
         # Map character names to voice IDs
+        # IMPORTANT: Dialogue must use exactly "Skeptic" and "Analyst" as character names
         result = generate_audio_from_script(
             dialogue=dialogue,
             output_file=str(output_path),
-            voice_id_skeptic=CHARACTERS["brother_marcus"]["voice_id"],
-            voice_id_analyst=CHARACTERS["sister_faith"]["voice_id"]
+            voice_id_skeptic=CHARACTERS["skeptic"]["voice_id"],
+            voice_id_analyst=CHARACTERS["analyst"]["voice_id"]
         )
 
         return [TextContent(type="text", text=f"Audio generated: {output_path}\n{result}")]
