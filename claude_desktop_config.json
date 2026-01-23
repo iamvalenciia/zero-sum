@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "zero-sum-lds": {
+      "command": "python",
+      "args": [
+        "/home/user/zero-sum/mcp/server.py"
+      ],
+      "env": {
+        "ELEVEN_LABS_API_KEY2": "${ELEVEN_LABS_API_KEY2}",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}"
+      }
+    }
+  }
+}
