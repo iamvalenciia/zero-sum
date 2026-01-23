@@ -32,13 +32,13 @@ from mcp.types import (
 )
 from pydantic import AnyUrl
 
-# Import core modules
+# Import core modules (use lds_mcp to avoid conflicts with mcp package)
 from src.core.elevenlabs import generate_audio_from_script
-from mcp.tools.script_generator import create_lds_script
-from mcp.tools.content_search import search_lds_content, search_world_news
-from mcp.tools.quote_verifier import verify_lds_quote
-from mcp.tools.image_manager import ImageManager
-from mcp.tools.short_renderer import render_short_video
+from lds_mcp.tools.script_generator import create_lds_script
+from lds_mcp.tools.content_search import search_lds_content, search_world_news
+from lds_mcp.tools.quote_verifier import verify_lds_quote
+from lds_mcp.tools.image_manager import ImageManager
+from lds_mcp.tools.short_renderer import render_short_video
 
 # Initialize server
 server = Server("zero-sum-lds")
