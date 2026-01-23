@@ -34,12 +34,30 @@ def generate_audio_from_script(dialogue: list[dict], output_file: str, voice_id_
             # los tags de audio (ej: [smug], <break>) directamente en el texto.
             text = line.get("text", line.get("line", ""))
             character = line.get("character", "")
-            
-            # Asignar Voice ID según el personaje
-            if character == "Skeptic":
-                voice_id = voice_id_skeptic
+
+            # Voice ID assignment priority:
+            # 1. Use voice_id from the dialogue line if explicitly provided
+            # 2. Map by character name (supports multiple aliases)
+            # 3. Default to analyst voice
+
+            if "voice_id" in line and line["voice_id"]:
+                # Use explicit voice_id from dialogue line
+                voice_id = line["voice_id"]
             else:
-                voice_id = voice_id_analyst # Default to Analyst if unknown
+                # Map by character name - support multiple aliases
+                # Skeptic names -> male voice (Charles)
+                # Analyst names -> female voice (Eve)
+                skeptic_names = {"Skeptic", "Brother Marcus", "skeptic", "brother marcus"}
+                analyst_names = {"Analyst", "Sister Faith", "analyst", "sister faith"}
+
+                if character in skeptic_names:
+                    voice_id = voice_id_skeptic
+                elif character in analyst_names:
+                    voice_id = voice_id_analyst
+                else:
+                    # Default to analyst for unknown characters
+                    voice_id = voice_id_analyst
+                    print(f"[AUDIO] Warning: Unknown character '{character}', using analyst voice")
 
             # Preparar objeto input según documentación oficial
             input_item = {
