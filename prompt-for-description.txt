@@ -7,4 +7,4 @@ production_plan.json
   y dame una descripcion para poner en mi video de canal de youtube y tambien incluye los timestmaps para separar en capitulos / secciones segun el tema que esta tratando el video..
 
 asegurate que sea en ingles
-actua como un profesional de videos para youtube como Paddy Galloway
+actua como un profesional de videos para youtube como Paddy Galloway 

@@ -13,9 +13,9 @@ load_dotenv()
 
 def generate_audio_from_script(dialogue: list[dict], output_file: str, voice_id_skeptic: str, voice_id_analyst: str) -> str:
     # 1. Validate API Key
-    api_key = os.getenv("ELEVEN_LABS_API_KEY")
+    api_key = os.getenv("ELEVEN_LABS_API_KEY2")
     if not api_key:
-        raise ValueError("[ERROR] ELEVEN_LABS_API_KEY not found in environment variables.")
+        raise ValueError("[ERROR] ELEVEN_LABS_API_KEY2 not found in environment variables.")
 
     # 2. Initialize Client
     try:

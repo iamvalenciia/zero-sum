@@ -1,39 +1,68 @@
 {
   "input_data": {
-    "topic": "chapter 2.2 Multiplying Matrices and Vectors from the book of deep learning",
-    "topic_context": "One of the most important operations involving matrices is multiplication of two
-matrices. e matrix product of matrices A and B is a third matrix C. In order for this
-product to be defined, A must have the same number of columns as B has rows. If A is of
-shape m × n and B is of shape n × p, then C is of shape m × p. We can write the matrix
-product just by placing two or more matrices together, for example,
-e product operation is defined by
-Note that the standard product of two matrices is not just a matrix containing the
-product of the individual elements. Such an operation exists and is called the elementwise product, or Hadamard product, and is denoted as A ⊙ B.
-e dot product between two vectors x and y of the same dimensionality is the matrix
-product x⊤y. We can think of the matrix product C = AB as computing Ci,j as the dot
-product between row i of A and column j of B.
-Matrix product operations have many useful properties that make mathematical
-analysis of matrices more convenient. For example, matrix multiplication is distributive:
-It is also associative:
-Matrix multiplication is not commutative (the condition AB = BA does not always hold),
-unlike scalar multiplication. However, the dot product between two vectors is
-commutative:
-e transpose of a matrix product has a simple form:
-is enables us to demonstrate equation 2.8 by exploiting the fact that the value of such a
-product is a scalar and therefore equal to its own transpose:
-Since the focus of this textbook is not linear algebra, we do not attempt to develop a
-comprehensive list of useful properties of the matrix product here, but the reader should
-be aware that many more exist.
-We now know enough linear algebra notation to write down a system of linear
-equations:
-where A ∈ ℝm×n is a known matrix, b ∈ ℝm is a known vector, and x ∈ ℝ
-n is a vector of
-unknown variables we would like to solve for. Each element xi of x is one of these
-unknown variables. Each row of A and each element of b provide another constraint. We
-can rewrite equation 2.11 as
-or even more explicitly as
-Matrix-vector product notation provides a more compact representation for equations
-of this form"
+    "topic": "chapter 2.5 Norms from the book of deep learning",
+    "topic_context": "2.5 Norms
+Sometimes we need to measure the size of a vector. In machine learning, we usually
+measure the size of vectors using a function called a norm. Formally, the L
+p
+ norm is given
+by
+for p ∈ ℝ, p ≥ 1.
+Norms, including the L
+p
+ norm, are functions mapping vectors to non-negative values.
+On an intuitive level, the norm of a vector x measures the distance from the origin to the
+point x. More rigorously, a norm is any function f that satisfies the following properties:
+f(x) = 0 ⇒ x = 0
+f(x + y) ≤ f(x) + f(y) (the triangle inequality)
+∀α ∈ ℝ, f(αx) = |α|f(x)
+e L
+2 norm, with p = 2, is known as the Euclidean norm, which is simply the
+Euclidean distance from the origin to the point identified by x. e L
+2 norm is used so
+frequently in machine learning that it is often denoted simply as ǁxǁ, with the subscript 2
+omitted. It is also common to measure the size of a vector using the squared L
+2 norm,
+which can be calculated simply as x⊤x.
+e squared L
+2 norm is more convenient to work with mathematically and
+computationally than the L
+2 norm itself. For example, each derivative of the squared L
+2
+norm with respect to each element of x depends only on the corresponding element of x,
+while all the derivatives of the L
+2 norm depend on the entire vector. In many contexts,
+the squared L
+2 norm may be undesirable because it increases very slowly near the origin.
+In several machine learning applications, it is important to discriminate between elements
+that are exactly zero and elements that are small but nonzero. In these cases, we turn to a
+function that grows at the same rate in all locations, but that retains mathematical
+simplicity: the L
+1 norm. e L
+1 norm may be simplified to
+e L
+1 norm is commonly used in machine learning when the difference between zero
+and nonzero elements is very important. Every time an element of x moves away from 0
+by ϵ, the L
+1 norm increases by ϵ.
+We sometimes measure the size of the vector by counting its number of nonzero
+elements. Some authors refer to this function as the “L
+0 norm,” but this is incorrect
+terminology. e number of nonzero entries in a vector is not a norm, because scaling
+the vector by α does not change the number of nonzero entries. e L
+1 norm is often
+used as a substitute for the number of nonzero entries.
+One other norm that commonly arises in machine learning is the L∞ norm, also
+known as the max norm. is norm simplifies to the absolute value of the element with
+the largest magnitude in the vector,
+Sometimes we may also wish to measure the size of a matrix. In the context of deep
+learning, the most common way to do this is with the otherwise obscure Frobenius
+norm:
+which is analogous to the L
+2 norm of a vector.
+e dot product of two vectors can be rewritten in terms of norms. Specifically,
+where θ is the angle between x and y.
+"
   },
   "instructions": {
     "Task": "Act as the Executive Producer & Audio-Visual Director for 'Zero Sum'. Your goal is to script a viral educational dialogue optimized for ElevenLabs V3 based on the 'input_data'.",
