@@ -7,6 +7,12 @@ Characters:
 - Sister Faith (formerly Analyst): The knowledgeable member who cites prophets, scriptures, testimonies
 - Brother Marcus (formerly Skeptic): The curious member learning about doctrine
 
+Key Features (v2.0):
+- Unified project management with consistent paths
+- Auto-save scripts when generated
+- Auto-generate timestamps when rendering
+- File management for images (copy/move from any location)
+
 Run with: python server.py
 """
 
@@ -39,6 +45,8 @@ from lds_mcp.tools.content_search import search_lds_content, search_world_news
 from lds_mcp.tools.quote_verifier import verify_lds_quote
 from lds_mcp.tools.image_manager import ImageManager
 from lds_mcp.tools.short_renderer import render_short_video
+from lds_mcp.tools.project_manager import get_project_manager
+from lds_mcp.tools.file_manager import handle_file_operation, FileManager
 
 # Initialize server
 server = Server("zero-sum-lds")
@@ -302,6 +310,99 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["project_id"]
             }
+        ),
+        Tool(
+            name="save_script",
+            description="""Save a generated script to the project.
+
+            IMPORTANT: Call this after generating a script JSON to save it to disk.
+            This ensures the script is available for audio generation and rendering.
+
+            The script will be:
+            1. Saved to data/shorts/scripts/{project_id}.json
+            2. Also saved to data/production_plan.json for CLI compatibility
+            3. Set as the current active project
+
+            Returns the project_id for subsequent operations.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script_json": {
+                        "type": "object",
+                        "description": "The complete script JSON object to save"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Optional: Override the project ID (defaults to script.id or auto-generated)"
+                    }
+                },
+                "required": ["script_json"]
+            }
+        ),
+        Tool(
+            name="manage_files",
+            description="""Manage files within the project (copy, move, list, register images).
+
+            Operations:
+            - copy: Copy a file from any location to the project
+            - move: Move a file within the project
+            - register_images: Copy multiple images to a project's images folder
+            - list: List directory contents
+            - list_project_images: List images registered for a project
+            - mkdir: Create a directory
+            - delete: Delete a file (requires confirm=true)
+
+            Use this to:
+            - Copy images from Downloads or other folders to the project
+            - Organize project files
+            - List available images""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["copy", "move", "register_images", "list", "list_project_images", "mkdir", "delete"],
+                        "description": "The file operation to perform"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Source file path (for copy/move)"
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination path (for copy/move)"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Directory path (for list/mkdir/delete)"
+                    },
+                    "image_paths": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of image paths (for register_images)"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID (for register_images/list_project_images)"
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "description": "Glob pattern for filtering (for list)",
+                        "default": "*"
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": "Overwrite existing files",
+                        "default": False
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "description": "Confirm deletion (required for delete)",
+                        "default": False
+                    }
+                },
+                "required": ["operation"]
+            }
         )
     ]
 
@@ -355,67 +456,162 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
         script_id = arguments.get("script_id")
         script_json = arguments.get("script_json")
 
+        pm = get_project_manager(DATA_DIR.parent)
+
+        # Try to load script from file if script_id provided
         if script_id:
             script_path = SHORTS_DIR / "scripts" / f"{script_id}.json"
             if script_path.exists():
                 with open(script_path) as f:
                     script_json = json.load(f)
+            # Set as current project
+            pm.set_current_project(script_id)
 
         if not script_json:
             return [TextContent(type="text", text="Error: No script provided or found")]
 
-        # Generate audio
-        output_path = SHORTS_DIR / "audio" / f"{script_id or 'dialogue'}.mp3"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Extract script_id from JSON if not provided
+        if not script_id:
+            script_content = script_json.get("script", script_json)
+            script_id = script_content.get("id")
+
+            # If still no ID, generate one and save the script
+            if not script_id:
+                script_id = pm.generate_project_id()
+                script_json["script"] = script_json.get("script", {})
+                script_json["script"]["id"] = script_id
+                pm.save_script(script_json, script_id)
+
+        # Get paths from ProjectManager
+        paths = pm.get_paths(script_id)
+
+        # Ensure directories exist
+        paths.audio_file.parent.mkdir(parents=True, exist_ok=True)
 
         dialogue = script_json.get("script", {}).get("dialogue", [])
 
-        # Map character names to voice IDs
-        # IMPORTANT: Dialogue must use exactly "Skeptic" and "Analyst" as character names
+        # If dialogue is empty, try top-level
+        if not dialogue and isinstance(script_json.get("dialogue"), list):
+            dialogue = script_json.get("dialogue", [])
+
+        if not dialogue:
+            return [TextContent(type="text", text="Error: No dialogue found in script")]
+
+        # Generate audio with correct voice mapping
         result = generate_audio_from_script(
             dialogue=dialogue,
-            output_file=str(output_path),
+            output_file=str(paths.audio_file),
             voice_id_skeptic=CHARACTERS["skeptic"]["voice_id"],
             voice_id_analyst=CHARACTERS["analyst"]["voice_id"]
         )
 
-        return [TextContent(type="text", text=f"Audio generated: {output_path}\n{result}")]
+        # Create legacy copy for CLI compatibility
+        try:
+            import shutil
+            paths.legacy_audio.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(paths.audio_file, paths.legacy_audio)
+        except Exception as e:
+            print(f"Warning: Could not create legacy audio copy: {e}")
+
+        response = {
+            "status": "success",
+            "project_id": script_id,
+            "audio_file": str(paths.audio_file),
+            "legacy_copy": str(paths.legacy_audio),
+            "message": result,
+            "next_steps": [
+                f"Render video: use render_short with script_id='{script_id}'",
+                "Timestamps will be auto-generated during render"
+            ]
+        }
+
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
     elif name == "render_short":
+        script_id = arguments.get("script_id")
+
+        # Set as current project
+        pm = get_project_manager(DATA_DIR.parent)
+        if script_id:
+            pm.set_current_project(script_id)
+
         result = await render_short_video(
-            script_id=arguments.get("script_id"),
+            script_id=script_id,
             hook_text=arguments.get("hook_text"),
             opening_image=arguments.get("opening_image"),
-            output_filename=arguments.get("output_filename", "short_video"),
-            shorts_dir=SHORTS_DIR
+            output_filename=arguments.get("output_filename", script_id or "short_video"),
+            shorts_dir=SHORTS_DIR,
+            auto_generate_timestamps=True  # Auto-generate if missing
         )
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     elif name == "list_projects":
-        projects = []
-        scripts_dir = SHORTS_DIR / "scripts"
-        if scripts_dir.exists():
-            for script_file in scripts_dir.glob("*.json"):
-                project_id = script_file.stem
-                projects.append({
-                    "id": project_id,
-                    "script": script_file.exists(),
-                    "audio": (SHORTS_DIR / "audio" / f"{project_id}.mp3").exists(),
-                    "video": (SHORTS_DIR / "output" / f"{project_id}.mp4").exists()
-                })
-        return [TextContent(type="text", text=json.dumps({"projects": projects}, indent=2))]
+        pm = get_project_manager(DATA_DIR.parent)
+        projects = pm.list_projects()
+        current = pm.get_current_project()
+
+        result = {
+            "current_project": current,
+            "projects": projects
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     elif name == "get_project_status":
         project_id = arguments.get("project_id")
-        status = {
-            "project_id": project_id,
-            "script": (SHORTS_DIR / "scripts" / f"{project_id}.json").exists(),
-            "audio": (SHORTS_DIR / "audio" / f"{project_id}.mp3").exists(),
-            "timestamps": (SHORTS_DIR / "audio" / f"{project_id}_timestamps.json").exists(),
-            "images": list((SHORTS_DIR / "images").glob(f"{project_id}_*")) if (SHORTS_DIR / "images").exists() else [],
-            "video": (SHORTS_DIR / "output" / f"{project_id}.mp4").exists()
-        }
+        pm = get_project_manager(DATA_DIR.parent)
+        try:
+            status = pm.get_project_status(project_id)
+        except:
+            status = {
+                "project_id": project_id,
+                "script": (SHORTS_DIR / "scripts" / f"{project_id}.json").exists(),
+                "audio": (SHORTS_DIR / "audio" / f"{project_id}.mp3").exists(),
+                "timestamps": (SHORTS_DIR / "audio" / f"{project_id}_timestamps.json").exists(),
+                "images": list((SHORTS_DIR / "images").glob(f"{project_id}_*")) if (SHORTS_DIR / "images").exists() else [],
+                "video": (SHORTS_DIR / "output" / f"{project_id}.mp4").exists()
+            }
         return [TextContent(type="text", text=json.dumps(status, indent=2))]
+
+    elif name == "save_script":
+        script_json = arguments.get("script_json")
+        project_id = arguments.get("project_id")
+
+        if not script_json:
+            return [TextContent(type="text", text="Error: script_json is required")]
+
+        pm = get_project_manager(DATA_DIR.parent)
+
+        try:
+            saved_id = pm.save_script(script_json, project_id)
+            paths = pm.get_paths(saved_id)
+
+            result = {
+                "status": "success",
+                "project_id": saved_id,
+                "saved_to": str(paths.script_file),
+                "legacy_copy": str(paths.legacy_production_plan),
+                "next_steps": [
+                    f"Generate audio: use generate_audio with script_id='{saved_id}'",
+                    f"Or render directly: use render_short with script_id='{saved_id}'"
+                ]
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        except Exception as e:
+            return [TextContent(type="text", text=f"Error saving script: {str(e)}")]
+
+    elif name == "manage_files":
+        operation = arguments.get("operation")
+
+        if not operation:
+            return [TextContent(type="text", text="Error: operation is required")]
+
+        result = await handle_file_operation(
+            operation=operation,
+            arguments=arguments,
+            base_dir=DATA_DIR.parent
+        )
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
 

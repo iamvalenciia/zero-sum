@@ -1,16 +1,23 @@
 """
 Short-Form Video Renderer (9:16 Vertical Format)
 Renders videos optimized for TikTok, Instagram Reels, and YouTube Shorts.
+
+Key Features:
+- Automatic timestamp generation if missing (no manual intervention needed)
+- Unified path management via ProjectManager
+- Legacy path compatibility for CLI tools
 """
 
 import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from lds_mcp.tools.project_manager import get_project_manager, ProjectPaths
 
 
 # Short-form video configuration
@@ -94,7 +101,8 @@ async def render_short_video(
     hook_text: str,
     opening_image: Optional[str] = None,
     output_filename: str = "short_video",
-    shorts_dir: Path = None
+    shorts_dir: Path = None,
+    auto_generate_timestamps: bool = True
 ) -> dict:
     """
     Render a short-form video (9:16 vertical format).
@@ -105,6 +113,7 @@ async def render_short_video(
         opening_image: Optional path to opening/thumbnail image
         output_filename: Output filename without extension
         shorts_dir: Directory for shorts data
+        auto_generate_timestamps: If True, automatically generate timestamps if missing
 
     Returns:
         dict: Render result with output path
@@ -113,6 +122,7 @@ async def render_short_video(
         shorts_dir = Path(__file__).parent.parent.parent / "data" / "shorts"
 
     shorts_dir = Path(shorts_dir)
+    base_dir = shorts_dir.parent.parent
 
     # Load script
     script_path = shorts_dir / "scripts" / f"{script_id}.json"
@@ -135,9 +145,35 @@ async def render_short_video(
             "action_required": "Please generate audio first using generate_audio"
         }
 
-    # Check for timestamps
+    # Check for timestamps - AUTO-GENERATE IF MISSING
     timestamps_path = shorts_dir / "audio" / f"{script_id}_timestamps.json"
     has_timestamps = timestamps_path.exists()
+
+    if not has_timestamps and auto_generate_timestamps:
+        # Auto-generate timestamps using Whisper
+        print(f"[RENDER] Timestamps missing. Auto-generating from audio...")
+        try:
+            timestamps_result = await _auto_generate_timestamps(
+                audio_path=audio_path,
+                timestamps_path=timestamps_path,
+                script_data=script_data,
+                base_dir=base_dir
+            )
+            if timestamps_result["status"] == "success":
+                has_timestamps = True
+                print(f"[RENDER] Timestamps generated successfully: {timestamps_path}")
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to auto-generate timestamps: {timestamps_result.get('error', 'Unknown error')}",
+                    "details": timestamps_result
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to auto-generate timestamps: {str(e)}",
+                "action_required": f"Run manually: python main.py create-dialogue-timestamps --input {audio_path}"
+            }
 
     # Prepare output directory
     output_dir = shorts_dir / "output"
@@ -157,21 +193,19 @@ async def render_short_video(
         "character_mapping": CHARACTER_MAPPING
     }
 
-    # Check if we need to generate timestamps first
+    # Final check for timestamps
     if not has_timestamps:
         return {
             "status": "needs_timestamps",
-            "message": "Audio timestamps not found",
+            "message": "Audio timestamps not found and auto-generation failed",
             "render_plan": render_plan,
             "action_required": """
-To complete the render, timestamps need to be generated:
+To complete the render, timestamps need to be generated manually:
 
 1. Run the timestamp generation:
    python main.py create-dialogue-timestamps --input {audio_path}
 
-2. Or use the existing whisper module to transcribe
-
-3. Then run render_short again
+2. Then run render_short again
 """,
             "next_steps": [
                 "Generate timestamps from audio",
@@ -215,6 +249,60 @@ python main.py video-render --mode short --script {script_id}
     }
 
     return result
+
+
+async def _auto_generate_timestamps(
+    audio_path: Path,
+    timestamps_path: Path,
+    script_data: Dict[str, Any],
+    base_dir: Path
+) -> Dict[str, Any]:
+    """
+    Automatically generate timestamps from audio using Whisper.
+
+    This eliminates the need for manual CLI commands.
+    """
+    try:
+        from src.core.whisper import generate_timestamps_from_audio
+
+        # Extract dialogue from script for alignment
+        script_content = script_data.get("script", {}).get("dialogue", [])
+
+        if not script_content and isinstance(script_data.get("dialogue"), list):
+            script_content = script_data.get("dialogue", [])
+
+        print(f"[TIMESTAMPS] Generating from: {audio_path}")
+        print(f"[TIMESTAMPS] Script segments: {len(script_content)}")
+
+        # Generate timestamps
+        result_path = generate_timestamps_from_audio(
+            audio_file=str(audio_path),
+            output_file=str(timestamps_path),
+            script_content=script_content,
+            model_size="base"
+        )
+
+        # Also create legacy copy for CLI compatibility
+        legacy_timestamps = base_dir / "data" / "audio" / "elevenlabs" / "dialogue_timestamps.json"
+        legacy_timestamps.parent.mkdir(parents=True, exist_ok=True)
+
+        if timestamps_path.exists():
+            import shutil
+            shutil.copy2(timestamps_path, legacy_timestamps)
+
+        return {
+            "status": "success",
+            "timestamps_file": str(timestamps_path),
+            "legacy_copy": str(legacy_timestamps)
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
 
 
 async def execute_render(
