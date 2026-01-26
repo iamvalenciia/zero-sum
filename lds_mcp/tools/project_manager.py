@@ -159,8 +159,14 @@ class ProjectManager:
     def save_script(self, script_data: Dict, project_id: Optional[str] = None) -> str:
         """
         Save a script and set it as current project.
+        Includes JSON validation to prevent format errors.
         Returns the project_id.
         """
+        # Validate JSON structure
+        validation_result = self._validate_script_json(script_data)
+        if not validation_result["valid"]:
+            raise ValueError(f"Invalid script JSON: {validation_result['error']}")
+
         # Extract or generate project ID
         script_content = script_data.get("script", script_data)
         pid = project_id or script_content.get("id") or self.generate_project_id()
@@ -188,6 +194,62 @@ class ProjectManager:
         self.set_current_project(pid)
 
         return pid
+
+    def _validate_script_json(self, script_data: Dict) -> Dict[str, Any]:
+        """
+        Validate script JSON structure to prevent format errors.
+
+        Returns:
+            Dict with 'valid' (bool) and 'error' (str if invalid)
+        """
+        try:
+            # Check basic structure
+            if not isinstance(script_data, dict):
+                return {"valid": False, "error": "Script must be a JSON object"}
+
+            # Get the script content (could be nested under "script" key or at root)
+            script = script_data.get("script", script_data)
+
+            # Check required fields
+            if "dialogue" not in script:
+                return {"valid": False, "error": "Missing 'dialogue' array in script"}
+
+            dialogue = script.get("dialogue", [])
+            if not isinstance(dialogue, list):
+                return {"valid": False, "error": "'dialogue' must be an array"}
+
+            if len(dialogue) == 0:
+                return {"valid": False, "error": "'dialogue' array is empty"}
+
+            # Validate each dialogue line
+            for i, line in enumerate(dialogue):
+                if not isinstance(line, dict):
+                    return {"valid": False, "error": f"Dialogue line {i} must be an object"}
+
+                if "character" not in line:
+                    return {"valid": False, "error": f"Dialogue line {i} missing 'character'"}
+
+                if "text" not in line:
+                    return {"valid": False, "error": f"Dialogue line {i} missing 'text'"}
+
+                # Validate character name
+                char = line.get("character", "")
+                valid_chars = {"Analyst", "Skeptic", "Sister Faith", "Brother Marcus"}
+                if char not in valid_chars:
+                    return {
+                        "valid": False,
+                        "error": f"Dialogue line {i} has invalid character '{char}'. Must be one of: {valid_chars}"
+                    }
+
+            # Try to serialize to ensure it's valid JSON
+            json.dumps(script_data, ensure_ascii=False)
+
+            return {"valid": True, "error": None}
+
+        except json.JSONDecodeError as e:
+            return {"valid": False, "error": f"Invalid JSON: {str(e)}"}
+        except Exception as e:
+            return {"valid": False, "error": f"Validation error: {str(e)}"}
 
     def load_script(self, project_id: Optional[str] = None) -> Optional[Dict]:
         """Load a script by project ID."""
