@@ -20,6 +20,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from lds_mcp.tools.project_manager import get_project_manager, ProjectPaths
 
 
+def log(message: str, level: str = "INFO"):
+    """Log to stderr so Claude Desktop can capture it."""
+    print(f"[SHORT_RENDERER][{level}] {message}", file=sys.stderr, flush=True)
+
+
 # Short-form video configuration
 SHORT_CONFIG = {
     # Video dimensions (9:16 vertical)
@@ -319,34 +324,53 @@ async def execute_render(
     """
     import traceback
 
+    log("=" * 60)
+    log("EXECUTE_RENDER STARTED")
+    log(f"script_id: {script_id}")
+    log(f"hook_text: {hook_text}")
+    log(f"opening_image: {opening_image}")
+    log(f"output_filename: {output_filename}")
+    log("=" * 60)
+
     if shorts_dir is None:
         shorts_dir = Path(__file__).parent.parent.parent / "data" / "shorts"
 
     shorts_dir = Path(shorts_dir)
     base_dir = shorts_dir.parent.parent
 
+    log(f"shorts_dir: {shorts_dir}")
+    log(f"base_dir: {base_dir}")
+
     try:
         # Validate prerequisites
+        log("Step 1: Validating prerequisites...")
+
         script_path = shorts_dir / "scripts" / f"{script_id}.json"
+        log(f"Checking script: {script_path}")
         if not script_path.exists():
+            log(f"Script NOT FOUND: {script_path}", "ERROR")
             return {
                 "status": "error",
                 "message": f"Script not found: {script_path}",
                 "action_required": "Create a script first using create_script"
             }
+        log("Script found OK")
 
         audio_path = shorts_dir / "audio" / f"{script_id}.mp3"
+        log(f"Checking audio: {audio_path}")
         if not audio_path.exists():
+            log(f"Audio NOT FOUND: {audio_path}", "ERROR")
             return {
                 "status": "error",
                 "message": f"Audio not found: {audio_path}",
                 "action_required": "Generate audio first using generate_audio"
             }
+        log("Audio found OK")
 
         timestamps_path = shorts_dir / "audio" / f"{script_id}_timestamps.json"
+        log(f"Checking timestamps: {timestamps_path}")
         if not timestamps_path.exists():
-            # Try to auto-generate timestamps
-            print(f"[RENDER] Timestamps missing. Auto-generating...")
+            log("Timestamps missing. Auto-generating...", "WARN")
             with open(script_path) as f:
                 script_data = json.load(f)
 
@@ -358,33 +382,43 @@ async def execute_render(
             )
 
             if result["status"] != "success":
+                log(f"Failed to generate timestamps: {result}", "ERROR")
                 return {
                     "status": "error",
                     "message": f"Failed to generate timestamps: {result.get('error', 'Unknown')}",
                     "details": result
                 }
+            log("Timestamps generated OK")
+        else:
+            log("Timestamps found OK")
 
         # Load data
+        log("Step 2: Loading data...")
         with open(script_path) as f:
             script_data = json.load(f)
+        log(f"Script loaded: {len(script_data)} keys")
 
         with open(timestamps_path) as f:
             timestamps_data = json.load(f)
+        segments_count = len(timestamps_data.get("segments", []))
+        log(f"Timestamps loaded: {segments_count} segments")
 
         # Prepare output
+        log("Step 3: Preparing output...")
         output_dir = shorts_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{output_filename}.mp4"
+        log(f"Output path: {output_path}")
 
         # Create renderer and render video
-        print(f"[RENDER] Starting video render for {script_id}...")
-        print(f"[RENDER] Output: {output_path}")
-
+        log("Step 4: Creating ShortVideoRenderer...")
         renderer = ShortVideoRenderer(
             config=SHORT_CONFIG,
             base_dir=base_dir
         )
+        log("Renderer created OK")
 
+        log("Step 5: Starting render...")
         result = renderer.render(
             audio_path=str(audio_path),
             timestamps_data=timestamps_data,
@@ -392,8 +426,13 @@ async def execute_render(
             opening_image=opening_image,
             output_path=str(output_path)
         )
+        log(f"Render complete. Status: {result.get('status')}")
 
         if result["status"] == "success":
+            log("=" * 60)
+            log("EXECUTE_RENDER COMPLETED SUCCESSFULLY")
+            log(f"Output: {output_path}")
+            log("=" * 60)
             return {
                 "status": "success",
                 "output_path": str(output_path),
@@ -406,13 +445,17 @@ async def execute_render(
                 }
             }
         else:
+            log(f"Render failed: {result}", "ERROR")
             return result
 
     except Exception as e:
+        error_tb = traceback.format_exc()
+        log(f"EXCEPTION: {str(e)}", "ERROR")
+        log(f"Traceback:\n{error_tb}", "ERROR")
         return {
             "status": "error",
             "message": str(e),
-            "traceback": traceback.format_exc()
+            "traceback": error_tb
         }
 
 
@@ -423,6 +466,7 @@ class ShortVideoRenderer:
     """
 
     def __init__(self, config: dict, base_dir: Path):
+        log("ShortVideoRenderer.__init__ starting...")
         self.config = config
         self.base_dir = Path(base_dir)
         self.width = config["width"]
@@ -430,12 +474,17 @@ class ShortVideoRenderer:
         self.fps = config["fps"]
         self.bg_color = config["background_color"]
 
+        log(f"Video config: {self.width}x{self.height} @ {self.fps}fps")
+
         # Font setup
         self.font_path = self.base_dir / "data" / "font" / "GoogleSans-SemiBold.ttf"
         self._font_cache = {}
+        log(f"Font path: {self.font_path} (exists: {self.font_path.exists()})")
 
         # Character images directory
         self.images_dir = self.base_dir / "data" / "images"
+        log(f"Images dir: {self.images_dir} (exists: {self.images_dir.exists()})")
+        log("ShortVideoRenderer.__init__ complete")
 
     def _get_font(self, size: int):
         """Get or create a font of the specified size."""
@@ -444,8 +493,9 @@ class ShortVideoRenderer:
         if size not in self._font_cache:
             try:
                 self._font_cache[size] = ImageFont.truetype(str(self.font_path), size)
-            except IOError:
-                print(f"[RENDER] Warning: Could not load font, using default")
+                log(f"Font loaded: size {size}")
+            except IOError as e:
+                log(f"Could not load font: {e}. Using default", "WARN")
                 self._font_cache[size] = ImageFont.load_default()
         return self._font_cache[size]
 
@@ -465,15 +515,19 @@ class ShortVideoRenderer:
             f"{char_lower}.jpg",
         ]
 
+        log(f"Looking for image: {character} -> {char_lower}")
         for name in possible_names:
             img_path = self.images_dir / name
+            log(f"  Trying: {img_path} (exists: {img_path.exists()})")
             if img_path.exists():
                 try:
                     img = Image.open(img_path).convert("RGBA")
+                    log(f"  Loaded: {img_path} ({img.size})")
                     return img
                 except Exception as e:
-                    print(f"[RENDER] Error loading {img_path}: {e}")
+                    log(f"  Error loading {img_path}: {e}", "ERROR")
 
+        log(f"  No image found for {character}", "WARN")
         return None
 
     def _create_frame(
@@ -588,24 +642,52 @@ class ShortVideoRenderer:
         """
         Render the complete video.
         """
-        import av
-        from PIL import Image
-        import numpy as np
+        log("=" * 50)
+        log("ShortVideoRenderer.render() STARTING")
+        log(f"audio_path: {audio_path}")
+        log(f"hook_text: {hook_text}")
+        log(f"output_path: {output_path}")
+        log("=" * 50)
+
+        try:
+            log("Importing av (PyAV)...")
+            import av
+            log("PyAV imported OK")
+        except ImportError as e:
+            log(f"FAILED to import PyAV: {e}", "ERROR")
+            return {
+                "status": "error",
+                "message": f"PyAV not installed: {e}",
+                "fix": "pip install av"
+            }
+
+        try:
+            from PIL import Image
+            import numpy as np
+            log("PIL and numpy imported OK")
+        except ImportError as e:
+            log(f"FAILED to import PIL/numpy: {e}", "ERROR")
+            return {
+                "status": "error",
+                "message": f"Missing dependency: {e}"
+            }
 
         try:
             # Get audio duration
+            log(f"Opening audio file: {audio_path}")
             audio_container = av.open(audio_path)
             audio_stream = audio_container.streams.audio[0]
             audio_duration = float(audio_container.duration) / av.time_base
             audio_container.close()
-
-            print(f"[RENDER] Audio duration: {audio_duration:.2f}s")
+            log(f"Audio duration: {audio_duration:.2f}s")
 
             # Prepare segments timeline
             segments = timestamps_data.get("segments", [])
+            log(f"Segments in timestamps: {len(segments)}")
 
             # Build captions timeline from words
             captions_timeline = []
+            total_words = 0
             for segment in segments:
                 for word in segment.get("words", []):
                     text = word.get("text", word.get("word", "")).strip()
@@ -616,19 +698,26 @@ class ShortVideoRenderer:
                             "text": text,
                             "character": segment.get("character", "")
                         })
+                        total_words += 1
+            log(f"Captions timeline built: {total_words} words")
 
             # Load character images
+            log("Loading character images...")
             character_images = {}
             for char in ["Analyst", "Skeptic"]:
                 img = self._load_character_image(char, "front")
                 if img:
                     character_images[char] = img
-                    print(f"[RENDER] Loaded image for {char}")
+                    log(f"Loaded image for {char}: {img.size}")
+                else:
+                    log(f"No image found for {char}", "WARN")
 
             # Create output container
+            log(f"Creating output container: {output_path}")
             output_container = av.open(output_path, mode='w')
 
             # Add video stream
+            log("Adding video stream...")
             video_stream = output_container.add_stream(
                 self.config["video_codec"],
                 rate=self.fps
@@ -637,10 +726,11 @@ class ShortVideoRenderer:
             video_stream.height = self.height
             video_stream.pix_fmt = 'yuv420p'
             video_stream.bit_rate = int(self.config["video_bitrate"].replace("M", "000000"))
+            log(f"Video stream: {self.width}x{self.height}, {self.config['video_codec']}")
 
             # Render frames
             total_frames = int(audio_duration * self.fps)
-            print(f"[RENDER] Rendering {total_frames} frames...")
+            log(f"Starting frame render: {total_frames} frames")
 
             current_character = "Analyst"
 
@@ -675,19 +765,21 @@ class ShortVideoRenderer:
                 for packet in video_stream.encode(frame):
                     output_container.mux(packet)
 
-                # Progress indicator
+                # Progress indicator every 10 seconds
                 if frame_idx % (self.fps * 10) == 0:
                     progress = (frame_idx / total_frames) * 100
-                    print(f"[RENDER] Progress: {progress:.1f}%")
+                    log(f"Render progress: {progress:.1f}% ({frame_idx}/{total_frames})")
 
+            log("Flushing video encoder...")
             # Flush video encoder
             for packet in video_stream.encode():
                 output_container.mux(packet)
 
             output_container.close()
+            log("Video container closed")
 
             # Now mux audio with video using ffmpeg
-            print("[RENDER] Adding audio track...")
+            log("Adding audio track with FFmpeg...")
             temp_output = output_path.replace(".mp4", "_temp.mp4")
             os.rename(output_path, temp_output)
 
@@ -702,11 +794,12 @@ class ShortVideoRenderer:
                 "-shortest",
                 output_path
             ]
+            log(f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
 
             result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
 
             if result.returncode != 0:
-                print(f"[RENDER] FFmpeg error: {result.stderr}")
+                log(f"FFmpeg FAILED: {result.stderr}", "ERROR")
                 # Fallback: keep video without audio
                 os.rename(temp_output, output_path)
                 return {
@@ -719,8 +812,11 @@ class ShortVideoRenderer:
             # Clean up temp file
             if os.path.exists(temp_output):
                 os.remove(temp_output)
+                log("Temp file cleaned up")
 
-            print(f"[RENDER] Complete! Output: {output_path}")
+            log("=" * 50)
+            log(f"RENDER COMPLETE: {output_path}")
+            log("=" * 50)
 
             return {
                 "status": "success",
@@ -731,10 +827,13 @@ class ShortVideoRenderer:
 
         except Exception as e:
             import traceback
+            error_tb = traceback.format_exc()
+            log(f"RENDER EXCEPTION: {str(e)}", "ERROR")
+            log(f"Traceback:\n{error_tb}", "ERROR")
             return {
                 "status": "error",
                 "message": str(e),
-                "traceback": traceback.format_exc()
+                "traceback": error_tb
             }
 
 
