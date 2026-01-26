@@ -13,6 +13,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -20,9 +21,35 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from lds_mcp.tools.project_manager import get_project_manager, ProjectPaths
 
 
+# Log file for debugging (always visible)
+LOG_FILE = Path(__file__).parent.parent.parent / "data" / "render_log.txt"
+
+
 def log(message: str, level: str = "INFO"):
-    """Log to stderr so Claude Desktop can capture it."""
+    """Log to stderr AND to a file so we can always see what's happening."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_line = f"[{timestamp}][{level}] {message}"
+
+    # Always print to stderr (Claude Desktop might capture it)
     print(f"[SHORT_RENDERER][{level}] {message}", file=sys.stderr, flush=True)
+
+    # Also write to log file (guaranteed to be visible)
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_line + "\n")
+    except Exception:
+        pass  # Don't fail if we can't write to log
+
+
+def clear_log():
+    """Clear the log file at the start of a new render."""
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            f.write(f"=== Render Log Started at {datetime.now()} ===\n")
+    except Exception:
+        pass
 
 
 # Short-form video configuration
@@ -324,13 +351,57 @@ async def execute_render(
     """
     import traceback
 
+    # Clear log file and start fresh
+    clear_log()
+
     log("=" * 60)
     log("EXECUTE_RENDER STARTED")
+    log(f"Log file location: {LOG_FILE}")
     log(f"script_id: {script_id}")
     log(f"hook_text: {hook_text}")
     log(f"opening_image: {opening_image}")
     log(f"output_filename: {output_filename}")
     log("=" * 60)
+
+    # Check dependencies FIRST (fail fast)
+    log("Step 0: Checking dependencies...")
+    missing_deps = []
+
+    try:
+        import av
+        log("  PyAV: OK")
+    except ImportError as e:
+        log(f"  PyAV: MISSING - {e}", "ERROR")
+        missing_deps.append(("av", "pip install av"))
+
+    try:
+        from PIL import Image
+        log("  PIL: OK")
+    except ImportError as e:
+        log(f"  PIL: MISSING - {e}", "ERROR")
+        missing_deps.append(("Pillow", "pip install Pillow"))
+
+    try:
+        import numpy
+        log("  numpy: OK")
+    except ImportError as e:
+        log(f"  numpy: MISSING - {e}", "ERROR")
+        missing_deps.append(("numpy", "pip install numpy"))
+
+    if missing_deps:
+        error_msg = "Missing dependencies:\n"
+        for dep, install_cmd in missing_deps:
+            error_msg += f"  - {dep}: {install_cmd}\n"
+        log(error_msg, "ERROR")
+        return {
+            "status": "error",
+            "message": "Missing required dependencies",
+            "missing_dependencies": [d[0] for d in missing_deps],
+            "install_commands": [d[1] for d in missing_deps],
+            "log_file": str(LOG_FILE)
+        }
+
+    log("All dependencies OK")
 
     if shorts_dir is None:
         shorts_dir = Path(__file__).parent.parent.parent / "data" / "shorts"

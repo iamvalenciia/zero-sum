@@ -327,6 +327,28 @@ async def list_tools() -> list[Tool]:
             }
         ),
         Tool(
+            name="get_render_log",
+            description="""Get the render log file content to see what happened during rendering.
+
+            Use this tool AFTER calling execute_render to see:
+            - What step the render is on
+            - Any errors that occurred
+            - Progress information
+
+            This is essential for debugging render issues.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tail_lines": {
+                        "type": "integer",
+                        "description": "Number of lines from end to return (default: 100)",
+                        "default": 100
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
             name="list_projects",
             description="""List all current short video projects and their status.""",
             inputSchema={
@@ -678,6 +700,41 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
                 "traceback": error_tb
             }
             return [TextContent(type="text", text=json.dumps(error_result, indent=2))]
+
+    elif name == "get_render_log":
+        # Read the render log file
+        log_file = DATA_DIR / "render_log.txt"
+        tail_lines = arguments.get("tail_lines", 100)
+
+        try:
+            if log_file.exists():
+                with open(log_file, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                # Get last N lines
+                if len(lines) > tail_lines:
+                    lines = lines[-tail_lines:]
+
+                log_content = "".join(lines)
+                result = {
+                    "status": "success",
+                    "log_file": str(log_file),
+                    "total_lines": len(lines),
+                    "content": log_content
+                }
+            else:
+                result = {
+                    "status": "no_log",
+                    "message": f"Log file not found: {log_file}",
+                    "hint": "Run execute_render first to generate logs"
+                }
+        except Exception as e:
+            result = {
+                "status": "error",
+                "message": str(e)
+            }
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     elif name == "list_projects":
         pm = get_project_manager(DATA_DIR.parent)
