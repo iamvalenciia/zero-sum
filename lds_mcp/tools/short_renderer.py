@@ -570,25 +570,48 @@ class ShortVideoRenderer:
                 self._font_cache[size] = ImageFont.load_default()
         return self._font_cache[size]
 
-    def _load_character_image(self, character: str, pose: str = "front") -> Optional[any]:
-        """Load a character image based on character name and pose."""
+    def _load_character_image(self, character: str, pose: str = "front", mouth_open: bool = True) -> Optional[any]:
+        """Load a character image based on character name and pose.
+
+        Args:
+            character: Character name (Analyst, Skeptic, etc.)
+            pose: Pose type (close, front, side, pov)
+            mouth_open: Whether to load open mouth (True) or closed mouth (False) image
+        """
         from PIL import Image
 
         # Map character names
         char_key = CHARACTER_MAPPING.get(character, character)
         char_lower = char_key.lower()
 
-        # Try different naming conventions
-        possible_names = [
-            f"{char_lower}_{pose}.png",
-            f"{char_lower}_{pose}.jpg",
-            f"{char_lower}.png",
-            f"{char_lower}.jpg",
+        # Map pose to directory name
+        pose_to_dir = {
+            "close": "close_view",
+            "front": "front_view",
+            "side": "side_view",
+            "pov": "pov_view"
+        }
+
+        pose_dir = pose_to_dir.get(pose, f"{pose}_view")
+        mouth_state = "Open" if mouth_open else "Closed"
+
+        # Build possible paths based on actual directory structure
+        # Structure: data/images/{character}/{pose}_view/{Pose}Mouth_{State}.png
+        possible_paths = [
+            # New structure: analyst/close_view/CloseMouth_Open.png
+            self.images_dir / char_lower / pose_dir / f"CloseMouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"FrontMouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"SideMouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"PovMouth_{mouth_state}.png",
+            # Generic pattern
+            self.images_dir / char_lower / pose_dir / f"{pose.capitalize()}Mouth_{mouth_state}.png",
+            # Fallback to old flat structure
+            self.images_dir / f"{char_lower}_{pose}.png",
+            self.images_dir / f"{char_lower}.png",
         ]
 
-        log(f"Looking for image: {character} -> {char_lower}")
-        for name in possible_names:
-            img_path = self.images_dir / name
+        log(f"Looking for image: {character} -> {char_lower}/{pose_dir} (mouth: {mouth_state})")
+        for img_path in possible_paths:
             log(f"  Trying: {img_path} (exists: {img_path.exists()})")
             if img_path.exists():
                 try:
@@ -772,16 +795,22 @@ class ShortVideoRenderer:
                         total_words += 1
             log(f"Captions timeline built: {total_words} words")
 
-            # Load character images
+            # Load character images (both open and closed mouth for animation)
             log("Loading character images...")
             character_images = {}
             for char in ["Analyst", "Skeptic"]:
-                img = self._load_character_image(char, "front")
-                if img:
-                    character_images[char] = img
-                    log(f"Loaded image for {char}: {img.size}")
+                # Load both mouth states for each character
+                img_open = self._load_character_image(char, "close", mouth_open=True)
+                img_closed = self._load_character_image(char, "close", mouth_open=False)
+
+                if img_open or img_closed:
+                    character_images[char] = {
+                        "open": img_open or img_closed,  # Fallback if one is missing
+                        "closed": img_closed or img_open
+                    }
+                    log(f"Loaded images for {char}: open={img_open is not None}, closed={img_closed is not None}")
                 else:
-                    log(f"No image found for {char}", "WARN")
+                    log(f"No images found for {char}", "WARN")
 
             # Create output container
             log(f"Creating output container: {output_path}")
@@ -810,16 +839,34 @@ class ShortVideoRenderer:
 
                 # Find active caption and character
                 active_caption = ""
+                is_speaking = False
+                word_progress = 0.0
                 for cap in captions_timeline:
                     if cap["start"] <= current_time <= cap["end"]:
                         active_caption = cap["text"]
+                        is_speaking = True
+                        # Calculate progress within the word for mouth animation
+                        word_duration = cap["end"] - cap["start"]
+                        if word_duration > 0:
+                            word_progress = (current_time - cap["start"]) / word_duration
                         if cap["character"]:
                             mapped_char = CHARACTER_MAPPING.get(cap["character"], cap["character"])
                             current_character = mapped_char
                         break
 
-                # Get character image
-                char_img = character_images.get(current_character)
+                # Get character image with mouth animation
+                char_data = character_images.get(current_character)
+                char_img = None
+                if char_data:
+                    if is_speaking:
+                        # Alternate mouth open/closed based on time (syllable-like animation)
+                        # Open mouth for first 50% of each syllable cycle (approx 100ms cycles)
+                        cycle_position = (current_time * 10) % 1.0  # 10 cycles per second
+                        mouth_open = cycle_position < 0.5
+                        char_img = char_data["open"] if mouth_open else char_data["closed"]
+                    else:
+                        # Not speaking - mouth closed
+                        char_img = char_data["closed"]
 
                 # Create frame
                 frame_array = self._create_frame(

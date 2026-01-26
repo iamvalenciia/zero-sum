@@ -118,7 +118,7 @@ class VideoAnimationBuilder:
         return frames
 
     def _validate_segment_words(self, segment):
-        """Valida que las palabras estén dentro del rango del segmento"""
+        """Validates that words are within the segment time range"""
         start_time = segment.get('start', 0)
         end_time = segment.get('end', 0)
         words = segment.get('words', [])
