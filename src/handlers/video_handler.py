@@ -30,7 +30,7 @@ class BaseHandler(ABC):
         }
         
     def execute(self, command: Optional[str]):
-        """Ejecuta el comando exacto que el usuario pide."""
+        """Executes the exact command requested by the user."""
         if command in self.commands:
             handler = self.commands[command]
             try:
@@ -172,12 +172,12 @@ class BaseHandler(ABC):
         # ==========================
         script_obj = production_plan_data.get("script", {})
         
-        # Validar estructura del script
+        # Validate script structure
         full_dialogue = []
         if isinstance(script_obj, dict):
             full_dialogue = script_obj.get("dialogue", [])
         elif isinstance(script_obj, list):
-            # Soporte legacy por si acaso el JSON cambia
+            # Legacy support in case the JSON structure changes
             full_dialogue = script_obj
 
         if not full_dialogue:

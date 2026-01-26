@@ -32,7 +32,7 @@
     {
         "id": "analyst_pov",
         "character": "analyst",
-        "description": "dame una descripcion corta de una oracion acerca de esta imagen en ingles, describe la posicion y la toma de la imagen y elementos de la scena",
+        "description": "A POV shot captures the analyst from below, looking upward with a calm expression against a soft sky background.",
         "closed": {
             "image_id": 5,
             "name": "PovMouth_Closed",
