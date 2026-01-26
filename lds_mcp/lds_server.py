@@ -639,25 +639,45 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     elif name == "execute_render":
+        print(f"[MCP_SERVER] execute_render called", file=sys.stderr, flush=True)
+        print(f"[MCP_SERVER] arguments: {arguments}", file=sys.stderr, flush=True)
+
         script_id = arguments.get("script_id")
         hook_text = arguments.get("hook_text", "")
         opening_image = arguments.get("opening_image", "")
         output_filename = arguments.get("output_filename", script_id or "short_video")
+
+        print(f"[MCP_SERVER] script_id={script_id}, hook_text={hook_text}", file=sys.stderr, flush=True)
 
         # Set as current project
         pm = get_project_manager(DATA_DIR.parent)
         if script_id:
             pm.set_current_project(script_id)
 
-        # Execute the actual render
-        result = await execute_render(
-            script_id=script_id,
-            hook_text=hook_text,
-            opening_image=opening_image,
-            output_filename=output_filename,
-            shorts_dir=SHORTS_DIR
-        )
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        print(f"[MCP_SERVER] Calling execute_render function...", file=sys.stderr, flush=True)
+
+        try:
+            # Execute the actual render
+            result = await execute_render(
+                script_id=script_id,
+                hook_text=hook_text,
+                opening_image=opening_image,
+                output_filename=output_filename,
+                shorts_dir=SHORTS_DIR
+            )
+            print(f"[MCP_SERVER] execute_render returned: {result.get('status')}", file=sys.stderr, flush=True)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except Exception as e:
+            import traceback
+            error_tb = traceback.format_exc()
+            print(f"[MCP_SERVER] execute_render EXCEPTION: {str(e)}", file=sys.stderr, flush=True)
+            print(f"[MCP_SERVER] Traceback:\n{error_tb}", file=sys.stderr, flush=True)
+            error_result = {
+                "status": "error",
+                "message": str(e),
+                "traceback": error_tb
+            }
+            return [TextContent(type="text", text=json.dumps(error_result, indent=2))]
 
     elif name == "list_projects":
         pm = get_project_manager(DATA_DIR.parent)
