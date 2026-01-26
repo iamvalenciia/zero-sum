@@ -309,76 +309,433 @@ async def execute_render(
     script_id: str,
     hook_text: str,
     opening_image: str = "",
-    output_filename: str = "short_video"
+    output_filename: str = "short_video",
+    shorts_dir: Path = None
 ) -> dict:
     """
-    Actually execute the video render.
+    Actually execute the video render and create the final MP4 file.
 
-    This function imports and uses the existing video rendering infrastructure.
+    This function creates a short-form video (9:16 vertical format) using PyAV.
     """
-    try:
-        # Import the video renderer
-        from src.core.video_renderer import VideoAssembler
+    import traceback
 
+    if shorts_dir is None:
         shorts_dir = Path(__file__).parent.parent.parent / "data" / "shorts"
 
-        # Load script
+    shorts_dir = Path(shorts_dir)
+    base_dir = shorts_dir.parent.parent
+
+    try:
+        # Validate prerequisites
         script_path = shorts_dir / "scripts" / f"{script_id}.json"
+        if not script_path.exists():
+            return {
+                "status": "error",
+                "message": f"Script not found: {script_path}",
+                "action_required": "Create a script first using create_script"
+            }
+
+        audio_path = shorts_dir / "audio" / f"{script_id}.mp3"
+        if not audio_path.exists():
+            return {
+                "status": "error",
+                "message": f"Audio not found: {audio_path}",
+                "action_required": "Generate audio first using generate_audio"
+            }
+
+        timestamps_path = shorts_dir / "audio" / f"{script_id}_timestamps.json"
+        if not timestamps_path.exists():
+            # Try to auto-generate timestamps
+            print(f"[RENDER] Timestamps missing. Auto-generating...")
+            with open(script_path) as f:
+                script_data = json.load(f)
+
+            result = await _auto_generate_timestamps(
+                audio_path=audio_path,
+                timestamps_path=timestamps_path,
+                script_data=script_data,
+                base_dir=base_dir
+            )
+
+            if result["status"] != "success":
+                return {
+                    "status": "error",
+                    "message": f"Failed to generate timestamps: {result.get('error', 'Unknown')}",
+                    "details": result
+                }
+
+        # Load data
         with open(script_path) as f:
             script_data = json.load(f)
 
-        # Load timestamps
-        timestamps_path = shorts_dir / "audio" / f"{script_id}_timestamps.json"
         with open(timestamps_path) as f:
             timestamps_data = json.load(f)
 
-        # Map character names in script
-        dialogue = script_data.get("script", {}).get("dialogue", [])
-        for line in dialogue:
-            char = line.get("character", "")
-            if char in CHARACTER_MAPPING:
-                line["_original_character"] = char
-                line["character"] = CHARACTER_MAPPING[char]
+        # Prepare output
+        output_dir = shorts_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{output_filename}.mp4"
 
-            # Map pose IDs
-            for pose in line.get("character_poses", []):
-                pose_id = pose.get("pose_id", "")
-                if pose_id in POSE_MAPPING:
-                    pose["pose_id"] = POSE_MAPPING[pose_id]
+        # Create renderer and render video
+        print(f"[RENDER] Starting video render for {script_id}...")
+        print(f"[RENDER] Output: {output_path}")
 
-        # Create video script format
-        video_script = {
-            "audio_file": str(shorts_dir / "audio" / f"{script_id}.mp3"),
-            "hook_text": hook_text,
-            "opening_image": opening_image if opening_image else None,
-            "video_plan": timestamps_data.get("segments", []),
-            "config": SHORT_CONFIG
-        }
+        renderer = ShortVideoRenderer(
+            config=SHORT_CONFIG,
+            base_dir=base_dir
+        )
 
-        # Save as video-script.json for the renderer
-        video_script_path = shorts_dir / f"{script_id}_video_script.json"
-        with open(video_script_path, "w") as f:
-            json.dump(video_script, f, indent=2)
+        result = renderer.render(
+            audio_path=str(audio_path),
+            timestamps_data=timestamps_data,
+            hook_text=hook_text,
+            opening_image=opening_image,
+            output_path=str(output_path)
+        )
 
-        # Output path
-        output_path = shorts_dir / "output" / f"{output_filename}.mp4"
-
-        # Note: The actual rendering would be done by VideoAssembler
-        # This is a placeholder for the integration
-
-        return {
-            "status": "render_started",
-            "video_script": str(video_script_path),
-            "output_path": str(output_path),
-            "message": "Video rendering initiated. Check output directory for result."
-        }
+        if result["status"] == "success":
+            return {
+                "status": "success",
+                "output_path": str(output_path),
+                "duration": result.get("duration", 0),
+                "message": f"Video rendered successfully!",
+                "video_specs": {
+                    "dimensions": f"{SHORT_CONFIG['width']}x{SHORT_CONFIG['height']}",
+                    "format": "MP4 (H.264)",
+                    "platforms": ["TikTok", "Instagram Reels", "YouTube Shorts"]
+                }
+            }
+        else:
+            return result
 
     except Exception as e:
         return {
             "status": "error",
             "message": str(e),
-            "traceback": str(e.__traceback__)
+            "traceback": traceback.format_exc()
         }
+
+
+class ShortVideoRenderer:
+    """
+    Renderer for short-form videos (9:16 vertical format).
+    Uses PyAV for efficient video encoding.
+    """
+
+    def __init__(self, config: dict, base_dir: Path):
+        self.config = config
+        self.base_dir = Path(base_dir)
+        self.width = config["width"]
+        self.height = config["height"]
+        self.fps = config["fps"]
+        self.bg_color = config["background_color"]
+
+        # Font setup
+        self.font_path = self.base_dir / "data" / "font" / "GoogleSans-SemiBold.ttf"
+        self._font_cache = {}
+
+        # Character images directory
+        self.images_dir = self.base_dir / "data" / "images"
+
+    def _get_font(self, size: int):
+        """Get or create a font of the specified size."""
+        from PIL import ImageFont
+
+        if size not in self._font_cache:
+            try:
+                self._font_cache[size] = ImageFont.truetype(str(self.font_path), size)
+            except IOError:
+                print(f"[RENDER] Warning: Could not load font, using default")
+                self._font_cache[size] = ImageFont.load_default()
+        return self._font_cache[size]
+
+    def _load_character_image(self, character: str, pose: str = "front") -> Optional[any]:
+        """Load a character image based on character name and pose."""
+        from PIL import Image
+
+        # Map character names
+        char_key = CHARACTER_MAPPING.get(character, character)
+        char_lower = char_key.lower()
+
+        # Try different naming conventions
+        possible_names = [
+            f"{char_lower}_{pose}.png",
+            f"{char_lower}_{pose}.jpg",
+            f"{char_lower}.png",
+            f"{char_lower}.jpg",
+        ]
+
+        for name in possible_names:
+            img_path = self.images_dir / name
+            if img_path.exists():
+                try:
+                    img = Image.open(img_path).convert("RGBA")
+                    return img
+                except Exception as e:
+                    print(f"[RENDER] Error loading {img_path}: {e}")
+
+        return None
+
+    def _create_frame(
+        self,
+        character: str,
+        caption_text: str,
+        hook_text: str,
+        character_image: any = None
+    ) -> any:
+        """Create a single video frame."""
+        from PIL import Image, ImageDraw
+        import numpy as np
+
+        # Create base frame with background color
+        frame = Image.new('RGB', (self.width, self.height), self.bg_color)
+        draw = ImageDraw.Draw(frame)
+
+        # 1. Draw character image (centered in character area)
+        if character_image:
+            char_cfg = self.config["character_area"]
+            char_y_start = int(self.height * char_cfg["y_start"])
+            char_y_end = int(self.height * char_cfg["y_end"])
+            char_width = int(self.width * char_cfg["width_ratio"])
+            char_height = char_y_end - char_y_start
+
+            # Resize character to fit
+            img_ratio = character_image.width / character_image.height
+            target_ratio = char_width / char_height
+
+            if img_ratio > target_ratio:
+                new_width = char_width
+                new_height = int(char_width / img_ratio)
+            else:
+                new_height = char_height
+                new_width = int(char_height * img_ratio)
+
+            resized = character_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # Center in character area
+            x = (self.width - new_width) // 2
+            y = char_y_start + (char_height - new_height) // 2
+
+            # Paste with alpha if available
+            if resized.mode == 'RGBA':
+                frame.paste(resized, (x, y), resized)
+            else:
+                frame.paste(resized, (x, y))
+
+        # 2. Draw hook text at top
+        if hook_text:
+            hook_cfg = self.config["hook_text"]
+            font_size = int(self.height * hook_cfg["font_size_ratio"])
+            font = self._get_font(font_size)
+
+            y_pos = int(self.height * hook_cfg["y_position"])
+
+            # Draw with stroke for visibility
+            self._draw_text_with_stroke(
+                draw, hook_text, font,
+                x=self.width // 2,
+                y=y_pos,
+                text_color=tuple(hook_cfg["color"]),
+                stroke_color=tuple(hook_cfg["stroke_color"]),
+                stroke_width=hook_cfg["stroke_width"],
+                anchor="mt"  # Middle-Top
+            )
+
+        # 3. Draw caption at bottom
+        if caption_text:
+            cap_cfg = self.config["captions"]
+            font_size = int(self.height * cap_cfg["font_size_ratio"])
+            font = self._get_font(font_size)
+
+            y_pos = int(self.height * cap_cfg["y_position"])
+
+            # Draw with stroke
+            self._draw_text_with_stroke(
+                draw, caption_text, font,
+                x=self.width // 2,
+                y=y_pos,
+                text_color=tuple(cap_cfg["color"]),
+                stroke_color=tuple(cap_cfg["stroke_color"]),
+                stroke_width=cap_cfg["stroke_width"],
+                anchor="mm"  # Middle-Middle
+            )
+
+        return np.array(frame)
+
+    def _draw_text_with_stroke(
+        self, draw, text: str, font, x: int, y: int,
+        text_color: tuple, stroke_color: tuple, stroke_width: int,
+        anchor: str = "mm"
+    ):
+        """Draw text with stroke/outline for better visibility."""
+        # Draw stroke (outline)
+        for dx in range(-stroke_width, stroke_width + 1):
+            for dy in range(-stroke_width, stroke_width + 1):
+                if dx * dx + dy * dy <= stroke_width * stroke_width:
+                    draw.text((x + dx, y + dy), text, font=font, fill=stroke_color, anchor=anchor)
+
+        # Draw main text
+        draw.text((x, y), text, font=font, fill=text_color, anchor=anchor)
+
+    def render(
+        self,
+        audio_path: str,
+        timestamps_data: dict,
+        hook_text: str,
+        opening_image: str,
+        output_path: str
+    ) -> dict:
+        """
+        Render the complete video.
+        """
+        import av
+        from PIL import Image
+        import numpy as np
+
+        try:
+            # Get audio duration
+            audio_container = av.open(audio_path)
+            audio_stream = audio_container.streams.audio[0]
+            audio_duration = float(audio_container.duration) / av.time_base
+            audio_container.close()
+
+            print(f"[RENDER] Audio duration: {audio_duration:.2f}s")
+
+            # Prepare segments timeline
+            segments = timestamps_data.get("segments", [])
+
+            # Build captions timeline from words
+            captions_timeline = []
+            for segment in segments:
+                for word in segment.get("words", []):
+                    text = word.get("text", word.get("word", "")).strip()
+                    if text and word.get("start") is not None:
+                        captions_timeline.append({
+                            "start": word["start"],
+                            "end": word["end"],
+                            "text": text,
+                            "character": segment.get("character", "")
+                        })
+
+            # Load character images
+            character_images = {}
+            for char in ["Analyst", "Skeptic"]:
+                img = self._load_character_image(char, "front")
+                if img:
+                    character_images[char] = img
+                    print(f"[RENDER] Loaded image for {char}")
+
+            # Create output container
+            output_container = av.open(output_path, mode='w')
+
+            # Add video stream
+            video_stream = output_container.add_stream(
+                self.config["video_codec"],
+                rate=self.fps
+            )
+            video_stream.width = self.width
+            video_stream.height = self.height
+            video_stream.pix_fmt = 'yuv420p'
+            video_stream.bit_rate = int(self.config["video_bitrate"].replace("M", "000000"))
+
+            # Render frames
+            total_frames = int(audio_duration * self.fps)
+            print(f"[RENDER] Rendering {total_frames} frames...")
+
+            current_character = "Analyst"
+
+            for frame_idx in range(total_frames):
+                current_time = frame_idx / self.fps
+
+                # Find active caption and character
+                active_caption = ""
+                for cap in captions_timeline:
+                    if cap["start"] <= current_time <= cap["end"]:
+                        active_caption = cap["text"]
+                        if cap["character"]:
+                            mapped_char = CHARACTER_MAPPING.get(cap["character"], cap["character"])
+                            current_character = mapped_char
+                        break
+
+                # Get character image
+                char_img = character_images.get(current_character)
+
+                # Create frame
+                frame_array = self._create_frame(
+                    character=current_character,
+                    caption_text=active_caption,
+                    hook_text=hook_text,
+                    character_image=char_img
+                )
+
+                # Encode frame
+                frame = av.VideoFrame.from_ndarray(frame_array, format='rgb24')
+                frame.pts = frame_idx
+
+                for packet in video_stream.encode(frame):
+                    output_container.mux(packet)
+
+                # Progress indicator
+                if frame_idx % (self.fps * 10) == 0:
+                    progress = (frame_idx / total_frames) * 100
+                    print(f"[RENDER] Progress: {progress:.1f}%")
+
+            # Flush video encoder
+            for packet in video_stream.encode():
+                output_container.mux(packet)
+
+            output_container.close()
+
+            # Now mux audio with video using ffmpeg
+            print("[RENDER] Adding audio track...")
+            temp_output = output_path.replace(".mp4", "_temp.mp4")
+            os.rename(output_path, temp_output)
+
+            import subprocess
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-i", temp_output,
+                "-i", audio_path,
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", self.config["audio_bitrate"],
+                "-shortest",
+                output_path
+            ]
+
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                print(f"[RENDER] FFmpeg error: {result.stderr}")
+                # Fallback: keep video without audio
+                os.rename(temp_output, output_path)
+                return {
+                    "status": "partial",
+                    "message": "Video created but audio muxing failed",
+                    "output_path": output_path,
+                    "error": result.stderr
+                }
+
+            # Clean up temp file
+            if os.path.exists(temp_output):
+                os.remove(temp_output)
+
+            print(f"[RENDER] Complete! Output: {output_path}")
+
+            return {
+                "status": "success",
+                "output_path": output_path,
+                "duration": audio_duration,
+                "frames": total_frames
+            }
+
+        except Exception as e:
+            import traceback
+            return {
+                "status": "error",
+                "message": str(e),
+                "traceback": traceback.format_exc()
+            }
 
 
 def create_short_video_script(
