@@ -47,6 +47,7 @@ from lds_mcp.tools.image_manager import ImageManager
 from lds_mcp.tools.short_renderer import render_short_video
 from lds_mcp.tools.project_manager import get_project_manager
 from lds_mcp.tools.file_manager import handle_file_operation, FileManager
+from lds_mcp.tools.workflow import handle_workflow_operation
 
 # Initialize server
 server = Server("zero-sum-lds")
@@ -403,6 +404,61 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["operation"]
             }
+        ),
+        Tool(
+            name="workflow",
+            description="""High-level workflow operations for streamlined video creation.
+
+            Operations:
+            - create_project: Initialize a new video project with topic
+            - finalize_script: Validate and save a generated script JSON
+            - produce_video: Check prerequisites and prepare for rendering
+            - get_summary: Get actionable project status
+
+            RECOMMENDED FLOW:
+            1. workflow(operation="create_project", topic="Your Topic")
+            2. [Generate script JSON based on instructions]
+            3. workflow(operation="finalize_script", script_json={...})
+            4. generate_audio(script_id="...")
+            5. render_short(script_id="...", hook_text="...")
+
+            This tool provides clearer guidance at each step.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["create_project", "finalize_script", "produce_video", "get_summary"],
+                        "description": "The workflow operation to perform"
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": "Video topic (for create_project)"
+                    },
+                    "topic_context": {
+                        "type": "string",
+                        "description": "Additional context, quotes, scriptures (for create_project)"
+                    },
+                    "hook_question": {
+                        "type": "string",
+                        "description": "Catchy question for video overlay (for create_project)"
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "description": "Target video duration (for create_project)",
+                        "default": 75
+                    },
+                    "script_json": {
+                        "type": "object",
+                        "description": "The generated script JSON (for finalize_script)"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID (optional, uses current project if not specified)"
+                    }
+                },
+                "required": ["operation"]
+            }
         )
     ]
 
@@ -607,6 +663,19 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
             return [TextContent(type="text", text="Error: operation is required")]
 
         result = await handle_file_operation(
+            operation=operation,
+            arguments=arguments,
+            base_dir=DATA_DIR.parent
+        )
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "workflow":
+        operation = arguments.get("operation")
+
+        if not operation:
+            return [TextContent(type="text", text="Error: operation is required")]
+
+        result = await handle_workflow_operation(
             operation=operation,
             arguments=arguments,
             base_dir=DATA_DIR.parent
