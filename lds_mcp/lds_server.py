@@ -44,7 +44,7 @@ from lds_mcp.tools.script_generator import create_lds_script
 from lds_mcp.tools.content_search import search_lds_content, search_world_news
 from lds_mcp.tools.quote_verifier import verify_lds_quote
 from lds_mcp.tools.image_manager import ImageManager
-from lds_mcp.tools.short_renderer import render_short_video
+from lds_mcp.tools.short_renderer import render_short_video, execute_render
 from lds_mcp.tools.project_manager import get_project_manager
 from lds_mcp.tools.file_manager import handle_file_operation, FileManager
 from lds_mcp.tools.workflow import handle_workflow_operation
@@ -255,16 +255,12 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="render_short",
-            description="""Render the final short-form video (9:16 vertical format).
+            description="""Prepare a short-form video render plan (9:16 vertical format).
 
-            Assembles:
-            - Opening image/thumbnail
-            - Hook text overlay (top of video)
-            - Character animations with lip sync
-            - Audio narration
-            - Captions
+            Validates all prerequisites and prepares the render configuration.
+            Use execute_render to actually render the video.
 
-            Output: MP4 file ready for TikTok/Reels/Shorts""",
+            Output: Render plan ready for execution""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -279,6 +275,47 @@ async def list_tools() -> list[Tool]:
                     "opening_image": {
                         "type": "string",
                         "description": "Path to opening/thumbnail image"
+                    },
+                    "output_filename": {
+                        "type": "string",
+                        "description": "Output filename (without extension)",
+                        "default": "short_video"
+                    }
+                },
+                "required": ["script_id", "hook_text"]
+            }
+        ),
+        Tool(
+            name="execute_render",
+            description="""Execute the video render and create the final MP4 file.
+
+            This tool ACTUALLY renders the video using FFmpeg/PyAV.
+            It creates the final short-form video (9:16 vertical, 1080x1920).
+
+            Assembles:
+            - Opening image/thumbnail with fade
+            - Hook text overlay (top of video)
+            - Character poses with lip sync
+            - Audio narration
+            - Word-by-word captions
+
+            Output: Final MP4 file ready for TikTok/Instagram Reels/YouTube Shorts
+
+            NOTE: This may take 1-5 minutes depending on video length.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script_id": {
+                        "type": "string",
+                        "description": "ID of the script to render"
+                    },
+                    "hook_text": {
+                        "type": "string",
+                        "description": "Text to display at top of video (3-5 words)"
+                    },
+                    "opening_image": {
+                        "type": "string",
+                        "description": "Path to opening/thumbnail image (optional)"
                     },
                     "output_filename": {
                         "type": "string",
@@ -598,6 +635,27 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
             output_filename=arguments.get("output_filename", script_id or "short_video"),
             shorts_dir=SHORTS_DIR,
             auto_generate_timestamps=True  # Auto-generate if missing
+        )
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "execute_render":
+        script_id = arguments.get("script_id")
+        hook_text = arguments.get("hook_text", "")
+        opening_image = arguments.get("opening_image", "")
+        output_filename = arguments.get("output_filename", script_id or "short_video")
+
+        # Set as current project
+        pm = get_project_manager(DATA_DIR.parent)
+        if script_id:
+            pm.set_current_project(script_id)
+
+        # Execute the actual render
+        result = await execute_render(
+            script_id=script_id,
+            hook_text=hook_text,
+            opening_image=opening_image,
+            output_filename=output_filename,
+            shorts_dir=SHORTS_DIR
         )
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
