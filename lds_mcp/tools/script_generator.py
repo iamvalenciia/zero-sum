@@ -287,6 +287,22 @@ After generation, save the script to: data/shorts/scripts/{script_id}.json
                 "Images appear at START of corresponding dialogue line",
                 "Use images for key moments: scripture references, prophet quotes, emotional peaks"
             ]
+        },
+        "floating_image_scheduling": {
+            "overview": "Floating images appear with blur background effect during video playback",
+            "timing_rules": {
+                "interval": "Place images every 15-20 seconds for optimal engagement",
+                "skip_start": "No images in first 5 seconds",
+                "skip_end": "No images in last 5 seconds",
+                "display_duration": "Each image shows for 5 seconds"
+            },
+            "placement_priorities": [
+                "Scripture references or quotes",
+                "Prophet mentions or teachings",
+                "Key doctrinal points",
+                "Emotional peaks or realizations"
+            ],
+            "calculation": f"For a {duration_seconds} second video, include approximately {max(1, duration_seconds // 17)} floating images"
         }
     }
 
@@ -438,3 +454,215 @@ def suggest_pose_for_text(character: str, text: str) -> str:
 
     # Fallback
     return f"{char_key}_front"
+
+
+def add_intelligent_image_scheduling(
+    script_data: dict,
+    min_interval_seconds: float = 15.0,
+    max_interval_seconds: float = 20.0,
+    words_per_second: float = 2.5
+) -> dict:
+    """
+    Add intelligent image scheduling to a script's visual_assets.
+
+    This ensures images are distributed evenly throughout the video,
+    appearing approximately every 15-20 seconds for optimal engagement.
+
+    Args:
+        script_data: The script JSON with dialogue
+        min_interval_seconds: Minimum seconds between floating images
+        max_interval_seconds: Maximum seconds between floating images
+        words_per_second: Average speaking rate (default 2.5 words/sec)
+
+    Returns:
+        dict: Updated script with visual_assets properly scheduled
+    """
+    script = script_data.get("script", script_data)
+    dialogue = script.get("dialogue", [])
+
+    if not dialogue:
+        return script_data
+
+    # Calculate word counts and estimated timestamps for each line
+    cumulative_words = 0
+    dialogue_timings = []
+
+    for idx, line in enumerate(dialogue):
+        text = line.get("text", "")
+        # Count words (excluding emotion tags)
+        import re
+        clean_text = re.sub(r'\[.*?\]', '', text)
+        word_count = len(clean_text.split())
+
+        start_time = cumulative_words / words_per_second
+        end_time = (cumulative_words + word_count) / words_per_second
+
+        dialogue_timings.append({
+            "index": idx,
+            "start_time": start_time,
+            "end_time": end_time,
+            "word_count": word_count,
+            "has_visual": line.get("visual_assets") is not None and len(line.get("visual_assets", [])) > 0
+        })
+
+        cumulative_words += word_count
+
+    total_duration = cumulative_words / words_per_second
+
+    # Calculate ideal image intervals
+    avg_interval = (min_interval_seconds + max_interval_seconds) / 2
+    num_images_needed = max(1, int(total_duration / avg_interval))
+
+    # Find existing images
+    existing_image_indices = [
+        t["index"] for t in dialogue_timings if t["has_visual"]
+    ]
+
+    # If we already have enough well-distributed images, return as is
+    if len(existing_image_indices) >= num_images_needed:
+        return script_data
+
+    # Calculate ideal timestamps for images
+    ideal_timestamps = []
+    for i in range(num_images_needed):
+        # Start at 5 seconds, end 5 seconds before end
+        available_window = total_duration - 10
+        if available_window > 0:
+            timestamp = 5 + (available_window / (num_images_needed + 1)) * (i + 1)
+            ideal_timestamps.append(timestamp)
+
+    # Find best dialogue lines for each ideal timestamp
+    suggested_image_lines = []
+    for ideal_time in ideal_timestamps:
+        # Find the dialogue line closest to this timestamp
+        best_idx = None
+        best_distance = float('inf')
+
+        for timing in dialogue_timings:
+            # Prefer lines that don't already have images
+            if timing["index"] in existing_image_indices:
+                continue
+            if timing["index"] in suggested_image_lines:
+                continue
+
+            # Calculate distance to ideal time
+            line_midpoint = (timing["start_time"] + timing["end_time"]) / 2
+            distance = abs(line_midpoint - ideal_time)
+
+            if distance < best_distance:
+                best_distance = distance
+                best_idx = timing["index"]
+
+        if best_idx is not None:
+            suggested_image_lines.append(best_idx)
+
+    # Add scheduling info to script
+    script_data["image_scheduling"] = {
+        "total_duration_estimate": total_duration,
+        "images_recommended": num_images_needed,
+        "existing_images_at_lines": existing_image_indices,
+        "suggested_add_images_at_lines": suggested_image_lines,
+        "interval_config": {
+            "min_seconds": min_interval_seconds,
+            "max_seconds": max_interval_seconds
+        },
+        "instructions": f"""
+To achieve optimal image pacing (every {min_interval_seconds}-{max_interval_seconds} seconds):
+
+Current images at dialogue lines: {existing_image_indices}
+Suggested lines to ADD images: {suggested_image_lines}
+
+For each suggested line, add a visual_assets array with:
+{{
+  "visual_asset_id": "auto_X",
+  "image_prompt": "Vector illustration: [describe relevant scene]. Modern LDS aesthetic."
+}}
+
+This will create a floating image effect with blur background during render.
+"""
+    }
+
+    return script_data
+
+
+def calculate_visual_asset_timing(
+    dialogue: list,
+    words_per_second: float = 2.5
+) -> list:
+    """
+    Calculate when each visual asset should appear based on dialogue timing.
+
+    Args:
+        dialogue: List of dialogue lines
+        words_per_second: Average speaking rate
+
+    Returns:
+        list: Visual asset timings with start/end times
+    """
+    import re
+
+    visual_timings = []
+    cumulative_words = 0
+
+    for idx, line in enumerate(dialogue):
+        text = line.get("text", "")
+        clean_text = re.sub(r'\[.*?\]', '', text)
+        word_count = len(clean_text.split())
+
+        start_time = cumulative_words / words_per_second
+
+        visual_assets = line.get("visual_assets", [])
+        if visual_assets:
+            for asset in visual_assets:
+                visual_timings.append({
+                    "dialogue_index": idx,
+                    "visual_asset_id": asset.get("visual_asset_id", f"asset_{idx}"),
+                    "image_prompt": asset.get("image_prompt", ""),
+                    "path": asset.get("path", ""),
+                    "start_time": start_time,
+                    "description": asset.get("description", asset.get("image_prompt", ""))
+                })
+
+        cumulative_words += word_count
+
+    return visual_timings
+
+
+def get_image_scheduling_guidelines() -> dict:
+    """
+    Get guidelines for intelligent image placement in scripts.
+
+    Returns:
+        dict: Guidelines and best practices for image scheduling
+    """
+    return {
+        "overview": """
+Floating images create visual interest and emphasize key points in LDS short videos.
+For optimal engagement, images should appear every 15-20 seconds.
+""",
+        "timing_rules": {
+            "minimum_interval": "15 seconds between images",
+            "maximum_interval": "20 seconds between images",
+            "skip_first": "5 seconds (let dialogue establish)",
+            "skip_last": "5 seconds (clean ending)",
+            "display_duration": "5 seconds per image"
+        },
+        "placement_priorities": [
+            "Scripture references or quotes",
+            "Prophet mentions or teachings",
+            "Key doctrinal points",
+            "Emotional peaks or realizations",
+            "Transition moments between topics"
+        ],
+        "image_prompt_guidelines": {
+            "style": "Clean professional Vector Illustrations. Modern LDS aesthetic.",
+            "avoid": ["'4k'", "'resolution'", "realistic photos", "copyrighted imagery"],
+            "include": ["relevant symbols", "emotions", "gospel themes", "clean composition"]
+        },
+        "example_prompts": [
+            "Vector illustration: Open scriptures with soft light rays. Clean modern style.",
+            "Vector illustration: Temple silhouette at sunset. Peaceful, contemplative.",
+            "Vector illustration: Family gathered around scriptures. Warm tones.",
+            "Vector illustration: Person kneeling in prayer. Soft gradient background."
+        ]
+    }
