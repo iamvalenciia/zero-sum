@@ -36,9 +36,7 @@
     {
         "id": "analyst_pov",
         "character": "analyst",
-        "type": "pov",
-        "description": "POV shot from Skeptic's perspective. Use when Analyst is being asked a question or listening.",
-        "emotion_triggers": ["listening", "responding", "[deep breath]"],
+        "description": "A POV shot captures the analyst from below, looking upward with a calm expression against a soft sky background.",
         "closed": {
             "image_id": 5,
             "name": "PovMouth_Closed",

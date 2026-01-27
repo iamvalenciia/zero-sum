@@ -761,42 +761,59 @@ class ShortVideoRenderer:
                 self._font_cache[size] = ImageFont.load_default()
         return self._font_cache[size]
 
-    def _is_speaking(self, current_time: float, words: List[Dict]) -> bool:
-        """
-        Determine if a character is speaking at the current time.
-        Returns True if currently within a word's timing.
-        """
-        for word in words:
-            start = word.get("start", 0)
-            end = word.get("end", 0)
-            if start <= current_time <= end:
-                duration = end - start
-                # Only show open mouth if word is long enough
-                if duration >= self.open_threshold:
-                    return True
-        return False
+    def _load_character_image(self, character: str, pose: str = "front", mouth_open: bool = True) -> Optional[any]:
+        """Load a character image based on character name and pose.
 
-    def _get_active_word(self, current_time: float, segments: List[Dict]) -> Tuple[str, str, str]:
+        Args:
+            character: Character name (Analyst, Skeptic, etc.)
+            pose: Pose type (close, front, side, pov)
+            mouth_open: Whether to load open mouth (True) or closed mouth (False) image
         """
-        Get the active word, character, and pose at the current time.
-        Returns (word, character, pose_id) tuple.
-        """
-        for segment in segments:
-            seg_start = segment.get("start", 0)
-            seg_end = segment.get("end", 0)
+        from PIL import Image
 
-            if seg_start <= current_time <= seg_end:
-                character = segment.get("character", "Analyst")
-                character = CHARACTER_MAPPING.get(character, character)
+        # Map character names
+        char_key = CHARACTER_MAPPING.get(character, character)
+        char_lower = char_key.lower()
 
-                for word in segment.get("words", []):
-                    w_start = word.get("start", 0)
-                    w_end = word.get("end", 0)
-                    if w_start <= current_time <= w_end:
-                        word_text = word.get("text", word.get("word", "")).strip()
-                        return (word_text, character, segment.get("pose_id", None))
+        # Map pose to directory name
+        pose_to_dir = {
+            "close": "close_view",
+            "front": "front_view",
+            "side": "side_view",
+            "pov": "pov_view"
+        }
 
-        return ("", "Analyst", None)
+        pose_dir = pose_to_dir.get(pose, f"{pose}_view")
+        mouth_state = "Open" if mouth_open else "Closed"
+
+        # Build possible paths based on actual directory structure
+        # Structure: data/images/{character}/{pose}_view/{Pose}Mouth_{State}.png
+        possible_paths = [
+            # New structure: analyst/close_view/CloseMouth_Open.png
+            self.images_dir / char_lower / pose_dir / f"CloseMouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"FrontMouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"SideMouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"PovMouth_{mouth_state}.png",
+            # Generic pattern
+            self.images_dir / char_lower / pose_dir / f"{pose.capitalize()}Mouth_{mouth_state}.png",
+            # Fallback to old flat structure
+            self.images_dir / f"{char_lower}_{pose}.png",
+            self.images_dir / f"{char_lower}.png",
+        ]
+
+        log(f"Looking for image: {character} -> {char_lower}/{pose_dir} (mouth: {mouth_state})")
+        for img_path in possible_paths:
+            log(f"  Trying: {img_path} (exists: {img_path.exists()})")
+            if img_path.exists():
+                try:
+                    img = Image.open(img_path).convert("RGBA")
+                    log(f"  Loaded: {img_path} ({img.size})")
+                    return img
+                except Exception as e:
+                    log(f"  Error loading {img_path}: {e}", "ERROR")
+
+        log(f"  No image found for {character}", "WARN")
+        return None
 
     def _create_frame(
         self,
@@ -980,20 +997,25 @@ class ShortVideoRenderer:
                             "text": word_text,
                             "character": character
                         })
+                        total_words += 1
+            log(f"Captions timeline built: {total_words} words")
 
-            log(f"Total words for lip-sync: {len(all_words)}")
+            # Load character images (both open and closed mouth for animation)
+            log("Loading character images...")
+            character_images = {}
+            for char in ["Analyst", "Skeptic"]:
+                # Load both mouth states for each character
+                img_open = self._load_character_image(char, "close", mouth_open=True)
+                img_closed = self._load_character_image(char, "close", mouth_open=False)
 
-            # Build segment lookup for pose
-            def get_pose_and_character(time: float) -> Tuple[str, str]:
-                """Get the character and pose_id at a given time."""
-                for seg in render_timeline:
-                    if seg.start_time <= time <= seg.end_time:
-                        return (seg.character, seg.pose_id)
-                # Default
-                return ("Analyst", "analyst_front")
-
-            # Track poses used
-            poses_used = set()
+                if img_open or img_closed:
+                    character_images[char] = {
+                        "open": img_open or img_closed,  # Fallback if one is missing
+                        "closed": img_closed or img_open
+                    }
+                    log(f"Loaded images for {char}: open={img_open is not None}, closed={img_closed is not None}")
+                else:
+                    log(f"No images found for {char}", "WARN")
 
             # Create output container
             log(f"Creating output container: {output_path}")
@@ -1029,10 +1051,34 @@ class ShortVideoRenderer:
 
                 # Find active caption word
                 active_caption = ""
-                for word in all_words:
-                    if word["start"] <= current_time <= word["end"]:
-                        active_caption = word["text"]
+                is_speaking = False
+                word_progress = 0.0
+                for cap in captions_timeline:
+                    if cap["start"] <= current_time <= cap["end"]:
+                        active_caption = cap["text"]
+                        is_speaking = True
+                        # Calculate progress within the word for mouth animation
+                        word_duration = cap["end"] - cap["start"]
+                        if word_duration > 0:
+                            word_progress = (current_time - cap["start"]) / word_duration
+                        if cap["character"]:
+                            mapped_char = CHARACTER_MAPPING.get(cap["character"], cap["character"])
+                            current_character = mapped_char
                         break
+
+                # Get character image with mouth animation
+                char_data = character_images.get(current_character)
+                char_img = None
+                if char_data:
+                    if is_speaking:
+                        # Alternate mouth open/closed based on time (syllable-like animation)
+                        # Open mouth for first 50% of each syllable cycle (approx 100ms cycles)
+                        cycle_position = (current_time * 10) % 1.0  # 10 cycles per second
+                        mouth_open = cycle_position < 0.5
+                        char_img = char_data["open"] if mouth_open else char_data["closed"]
+                    else:
+                        # Not speaking - mouth closed
+                        char_img = char_data["closed"]
 
                 # Create frame
                 frame_array = self._create_frame(

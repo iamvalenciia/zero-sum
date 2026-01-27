@@ -64,7 +64,7 @@ class VideoConfig:
         self.image_width = 2160    # Full height-based width (approx)
         
         # --- AUDIO CONFIGURATION ---
-        self.narration_volume = 1    # Volumen de la narración (0.0-2.0)
+        self.narration_volume = 1    # Narration volume (0.0-2.0)
         self.music_volume = 0.3       # Soft piano background (harmonic for students)
         
         # Encoding settings
@@ -237,7 +237,7 @@ class VideoAssembler:
 
             # 3. SOUND EFFECTS (Transition SFX)
             # User Request: "poner el trnasition sound en todos los cambios no solo en coold_hook"
-            # User Request: "asegurate de bajarle un 10% volumen" => 0.9
+            # User Request: "make sure to lower volume by 10%" => 0.9
             
             sfx_path = self.root_dir / "data/audio/sound_effect/shutter-click.mp3"
             
@@ -391,9 +391,9 @@ class VideoAssembler:
     def _find_active_segment(self, time: float, video_plan: List[Dict], 
                          start_idx: int = 0) -> tuple[Optional[Dict], int]:
         """
-        Encuentra el segmento activo para un tiempo dado.
+        Finds the active segment for a given time.
         Uses binary search for cold starts, linear scan for sequential access.
-        Retorna: (segmento, índice) o (None, último_índice_revisado)
+        Returns: (segment, index) or (None, last_checked_index)
         """
         n = len(video_plan)
         if n == 0:
@@ -451,7 +451,7 @@ class VideoAssembler:
             if cache_key in pil_image_cache:
                 return pil_image_cache[cache_key].copy() if copy else pil_image_cache[cache_key]
             
-            # Obtener array numpy
+            # Get numpy array
             arr = get_image_array(image_path, force_cover=force_cover)
             pil_img = Image.fromarray(arr)
             
@@ -762,7 +762,7 @@ class VideoAssembler:
                                             current_x = start_x_off + (target_x - start_x_off) * p
                                     
                                     # Animation: Floating / Levitation (Sine Wave)
-                                    # "Flotando suavemente"
+                                    # "Floating smoothly"
                                     lev_offset = math.sin(t * self.config.ctx_levitation_freq) * self.config.ctx_levitation_amp
                                     
                                     active_ctx_images.append({
@@ -773,9 +773,9 @@ class VideoAssembler:
 
                 # Compose Frame
                 try:
-                    # Obtener imagen base (con o sin blur) usando cache
+                    # Get base image (with or without blur) using cache
                     # If final screen, we might not want blur? Or treat as fullscreen?
-                    # "es solamente una imagen al final ... 40 segundos"
+                    # "it's just an image at the end... 40 seconds"
                     # It acts as the main background image. 
                     # If we use get_image_array logic, it places it on background.
                     base_img = get_pil_image(current_image_path, apply_blur=(is_fullscreen_active and not is_final_screen), force_cover=is_final_screen)
