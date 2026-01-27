@@ -48,6 +48,11 @@ from lds_mcp.tools.short_renderer import render_short_video, execute_render
 from lds_mcp.tools.project_manager import get_project_manager
 from lds_mcp.tools.file_manager import handle_file_operation, FileManager
 from lds_mcp.tools.workflow import handle_workflow_operation
+from lds_mcp.tools.project_state import (
+    get_state_manager,
+    get_welcome_message,
+    ProjectPhase
+)
 
 # Initialize server
 server = Server("zero-sum-lds")
@@ -518,6 +523,95 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["operation"]
             }
+        ),
+        Tool(
+            name="get_status",
+            description="""Get current project status and phase.
+
+            CALL THIS FIRST when starting a new chat to understand:
+            - What project is active (if any)
+            - What phase we're in (idea, script, audio, render, complete)
+            - What files exist
+            - What the next steps are
+
+            This helps avoid confusion and conflicts between projects.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        Tool(
+            name="archive_project",
+            description="""Archive the current project to old-videos folder.
+
+            Use this when:
+            - A video is complete and you want to start fresh
+            - You want to clean up before a new project
+            - There are leftover files from a previous project
+
+            Archives all project files (script, audio, timestamps, video) to:
+            old-videos/{project_id}_{timestamp}/
+
+            After archiving, the system is ready for a new project.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "delete_source": {
+                        "type": "boolean",
+                        "description": "Delete source files after archiving (default: true)",
+                        "default": True
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID to archive (uses current if not specified)"
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
+            name="cleanup_workspace",
+            description="""Clean up all project files to start completely fresh.
+
+            This will:
+            1. Archive the current project (if any)
+            2. Remove all files from data/shorts/
+            3. Reset project state
+
+            Use with caution - this removes all current project data.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "archive_first": {
+                        "type": "boolean",
+                        "description": "Archive current project before cleanup (default: true)",
+                        "default": True
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "description": "Confirm cleanup action (required)",
+                        "default": False
+                    }
+                },
+                "required": ["confirm"]
+            }
+        ),
+        Tool(
+            name="list_archived",
+            description="""List all archived projects in old-videos folder.
+
+            Shows previously completed or archived projects with:
+            - Project ID and topic
+            - Archive date
+            - Files included
+
+            Use this to review past work or restore a project.""",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
         )
     ]
 
@@ -815,6 +909,68 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
             arguments=arguments,
             base_dir=DATA_DIR.parent
         )
+
+        # Update project state when workflow creates/updates project
+        if operation == "create_project" and result.get("status") == "project_created":
+            sm = get_state_manager(DATA_DIR.parent)
+            sm.start_new_project(
+                project_id=result.get("project_id"),
+                topic=result.get("topic", ""),
+                hook_text=result.get("parameters", {}).get("hook_question", "")
+            )
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "get_status":
+        # Get comprehensive status report
+        welcome = get_welcome_message()
+        sm = get_state_manager(DATA_DIR.parent)
+        status_report = sm.get_status_report()
+
+        result = {
+            "welcome_message": welcome["message"],
+            "phase": welcome["phase"],
+            "status": status_report
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "archive_project":
+        sm = get_state_manager(DATA_DIR.parent)
+        project_id = arguments.get("project_id")
+        delete_source = arguments.get("delete_source", True)
+
+        # If specific project_id, update state first
+        if project_id:
+            sm._state.project_id = project_id
+            sm.refresh_state()
+
+        result = sm.archive_current_project(delete_after=delete_source)
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "cleanup_workspace":
+        confirm = arguments.get("confirm", False)
+        archive_first = arguments.get("archive_first", True)
+
+        if not confirm:
+            return [TextContent(type="text", text=json.dumps({
+                "status": "confirmation_required",
+                "message": "This will remove all project files. Set confirm=true to proceed.",
+                "warning": "All files in data/shorts/ will be deleted (archived first if archive_first=true)"
+            }, indent=2))]
+
+        sm = get_state_manager(DATA_DIR.parent)
+        result = sm.cleanup_all(archive_first=archive_first)
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "list_archived":
+        sm = get_state_manager(DATA_DIR.parent)
+        archived = sm.list_archived_projects()
+
+        result = {
+            "archived_projects": archived,
+            "total": len(archived),
+            "archive_location": str(sm.archive_dir)
+        }
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
@@ -824,6 +980,18 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
 async def list_prompts() -> list[Prompt]:
     """List available prompts for common tasks."""
     return [
+        Prompt(
+            name="welcome",
+            description="Start here! Check project status and get guidance on what to do next.",
+            arguments=[]
+        ),
+        Prompt(
+            name="new_video",
+            description="Start creating a new video from scratch",
+            arguments=[
+                {"name": "topic", "description": "Video topic", "required": True}
+            ]
+        ),
         Prompt(
             name="daily_inspiration",
             description="Create a daily inspirational short connecting world events with gospel principles",
@@ -853,7 +1021,120 @@ async def list_prompts() -> list[Prompt]:
 async def get_prompt(name: str, arguments: dict) -> GetPromptResult:
     """Get a specific prompt template."""
 
-    if name == "daily_inspiration":
+    if name == "welcome":
+        # Get current status
+        welcome = get_welcome_message()
+        sm = get_state_manager(DATA_DIR.parent)
+        status = sm.get_status_report()
+
+        # Build contextual welcome message
+        phase = status["current_phase"]
+
+        if phase["id"] == "idle":
+            prompt_text = f"""{welcome['message']}
+
+I've checked your project status. You have no active project.
+
+**Options:**
+1. Tell me a topic and I'll help you create a new video
+2. Say "list archived" to see your previous projects
+3. Ask me anything about LDS video creation
+
+What would you like to do?"""
+
+        elif phase["id"] == "complete":
+            project = status["project"]
+            prompt_text = f"""{welcome['message']}
+
+Your video for **"{project['topic']}"** is complete!
+
+**Options:**
+1. Say "archive" to save this project and start fresh
+2. Say "show video" to see the output location
+3. Tell me a new topic to start another video
+
+What would you like to do?"""
+
+        else:
+            project = status["project"]
+            files = status["files"]
+
+            prompt_text = f"""{welcome['message']}
+
+**Current project:** {project.get('topic', 'Untitled')} ({project.get('id', 'unknown')})
+
+**Progress:**
+- Script: {'Done' if files['script'] else 'Pending'}
+- Audio: {'Done' if files['audio'] else 'Pending'}
+- Video: {'Done' if files['video'] else 'Pending'}
+
+**Next steps:**
+"""
+            for action in status["next_actions"]:
+                prompt_text += f"- {action}\n"
+
+            prompt_text += "\nWould you like me to continue with the next step?"
+
+        return GetPromptResult(
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+
+    elif name == "new_video":
+        topic = arguments.get("topic", "")
+
+        # Check for existing project
+        sm = get_state_manager(DATA_DIR.parent)
+        status = sm.get_status_report()
+
+        if status["current_phase"]["id"] not in ["idle", "archived"]:
+            existing_topic = status["project"].get("topic", "Unknown")
+            prompt_text = f"""You want to create a new video about: **{topic}**
+
+However, there's an existing project for "{existing_topic}".
+
+**Options:**
+1. Archive the current project and start fresh with "{topic}"
+2. Continue working on "{existing_topic}"
+3. Abandon current project (not recommended)
+
+What would you like to do?"""
+        else:
+            prompt_text = f"""Let's create a new video about: **{topic}**
+
+I'll guide you through each step:
+
+1. **IDEA** - Research scriptures and prophet quotes
+2. **SCRIPT** - Create the dialogue between Analyst and Skeptic
+3. **AUDIO** - Generate voices with ElevenLabs
+4. **RENDER** - Create the final video with lip-sync
+
+First, let me search for relevant content about "{topic}"...
+
+Use these tools:
+- search_lds_content to find scriptures
+- workflow(operation="create_project", topic="{topic}") to initialize"""
+
+        return GetPromptResult(
+            messages=[
+                PromptMessage(
+                    role="user",
+                    content=TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+
+    elif name == "daily_inspiration":
         return GetPromptResult(
             messages=[
                 PromptMessage(
