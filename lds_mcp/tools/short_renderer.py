@@ -107,23 +107,51 @@ SHORT_CONFIG = {
         "fade_out": 0.5
     },
 
+    # Floating images (visual assets)
+    "floating_images": {
+        "enabled": True,
+        "min_interval_seconds": 15,    # Minimum seconds between images
+        "max_interval_seconds": 20,    # Maximum seconds between images
+        "display_duration": 5,         # How long each image shows (seconds)
+        "fade_in": 0.5,                # Fade in duration
+        "fade_out": 0.5,               # Fade out duration
+        "size_ratio": 0.6,             # Image size relative to screen width
+        "y_position": 0.45,            # Center position (45% from top)
+        "background_blur": 15,         # Blur radius for character behind
+        "skip_first_seconds": 5,       # Don't show images in first N seconds
+        "skip_last_seconds": 5,        # Don't show images in last N seconds
+        "hide_captions": True          # Hide captions when showing floating image
+    },
+
     # Audio
     "narration_volume": 1.0,
     "music_volume": 0.15,  # Lower for shorts
 
-    # Encoding
-    "video_codec": "libx264",  # H.264 for compatibility
+    # Encoding - GPU acceleration
+    "gpu_encoding": {
+        "enabled": True,               # Try GPU encoding first
+        "nvidia_codec": "h264_nvenc",  # NVIDIA NVENC encoder
+        "nvidia_preset": "p4",         # Balance of speed/quality (p1=fastest, p7=best)
+        "nvidia_tune": "hq",           # High quality tuning
+        "fallback_to_cpu": True        # Fall back to libx264 if GPU fails
+    },
+    "video_codec": "libx264",  # CPU fallback
     "audio_codec": "aac",
     "video_bitrate": "8M",
     "audio_bitrate": "192k",
     "preset": "medium",
     "crf": 23,
 
-    # Lip sync
+    # Lip sync - improved syllable-based animation
     "lip_sync": {
         "enabled": True,
-        "open_threshold": 0.05,  # Minimum word duration to show open mouth
-        "transition_frames": 2   # Frames for smooth transition
+        "mode": "syllable",            # "syllable" for natural, "fast" for old behavior
+        "syllable_duration_ms": 150,   # Duration of each syllable cycle (ms)
+        "open_ratio": 0.6,             # Mouth open for 60% of syllable
+        "pause_threshold_ms": 200,     # Pause longer than this = mouth closed
+        "vowels": "aeiouáéíóúAEIOUÁÉÍÓÚ",  # Characters that trigger mouth open
+        "respect_punctuation": True,   # Close mouth on . , ; : ! ?
+        "transition_frames": 2         # Frames for smooth transition
     }
 }
 
@@ -736,6 +764,9 @@ class ShortVideoRenderer:
 
         log(f"Video config: {self.width}x{self.height} @ {self.fps}fps")
 
+        # Images directory setup
+        self.images_dir = self.base_dir / "data" / "images"
+
         # Font setup
         self.font_path = self.base_dir / "data" / "font" / "GoogleSans-SemiBold.ttf"
         self._font_cache = {}
@@ -747,6 +778,206 @@ class ShortVideoRenderer:
         log(f"Lip sync: {'enabled' if self.lip_sync_enabled else 'disabled'}")
 
         log("ShortVideoRenderer.__init__ complete")
+
+    def _is_speaking(self, current_time: float, all_words: list) -> bool:
+        """Check if any character is speaking at the given time."""
+        for word in all_words:
+            if word["start"] <= current_time <= word["end"]:
+                return True
+        return False
+
+    def _calculate_floating_image_schedule(self, audio_duration: float, visual_assets: list) -> list:
+        """
+        Calculate when floating images should appear during the video.
+
+        Returns a list of dicts with:
+        - image_path: path to the image
+        - start_time: when to start showing
+        - end_time: when to stop showing
+        - fade_in_end: when fade-in completes
+        - fade_out_start: when fade-out begins
+        """
+        floating_config = self.config.get("floating_images", {})
+
+        if not floating_config.get("enabled", False) or not visual_assets:
+            return []
+
+        schedule = []
+        skip_start = floating_config.get("skip_first_seconds", 5)
+        skip_end = floating_config.get("skip_last_seconds", 5)
+        min_interval = floating_config.get("min_interval_seconds", 15)
+        max_interval = floating_config.get("max_interval_seconds", 20)
+        display_duration = floating_config.get("display_duration", 5)
+        fade_in = floating_config.get("fade_in", 0.5)
+        fade_out = floating_config.get("fade_out", 0.5)
+
+        # Calculate available time window
+        available_start = skip_start
+        available_end = audio_duration - skip_end
+
+        if available_end <= available_start:
+            log("Not enough time for floating images", "WARN")
+            return []
+
+        # Spread images evenly within the available window
+        avg_interval = (min_interval + max_interval) / 2
+        num_possible_slots = int((available_end - available_start - display_duration) / avg_interval) + 1
+        num_images = min(len(visual_assets), num_possible_slots)
+
+        if num_images == 0:
+            return []
+
+        # Calculate spacing
+        total_content_time = available_end - available_start
+        spacing = total_content_time / (num_images + 1) if num_images > 0 else 0
+
+        for i, asset in enumerate(visual_assets[:num_images]):
+            start_time = available_start + spacing * (i + 1) - display_duration / 2
+            start_time = max(available_start, min(start_time, available_end - display_duration))
+
+            end_time = start_time + display_duration
+            fade_in_end = start_time + fade_in
+            fade_out_start = end_time - fade_out
+
+            schedule.append({
+                "image_path": asset.get("path", asset.get("image_path", "")),
+                "description": asset.get("description", ""),
+                "start_time": start_time,
+                "end_time": end_time,
+                "fade_in_end": fade_in_end,
+                "fade_out_start": fade_out_start
+            })
+
+            log(f"Scheduled floating image: {start_time:.1f}s - {end_time:.1f}s ({asset.get('description', 'image')})")
+
+        return schedule
+
+    def _get_floating_image_opacity(self, current_time: float, schedule_item: dict) -> float:
+        """Calculate opacity for a floating image based on current time."""
+        start_time = schedule_item["start_time"]
+        end_time = schedule_item["end_time"]
+        fade_in_end = schedule_item["fade_in_end"]
+        fade_out_start = schedule_item["fade_out_start"]
+
+        if current_time < start_time or current_time > end_time:
+            return 0.0
+
+        # Fade in
+        if current_time < fade_in_end:
+            progress = (current_time - start_time) / (fade_in_end - start_time)
+            return max(0.0, min(1.0, progress))
+
+        # Fade out
+        if current_time > fade_out_start:
+            progress = (end_time - current_time) / (end_time - fade_out_start)
+            return max(0.0, min(1.0, progress))
+
+        # Full opacity
+        return 1.0
+
+    def _apply_blur_to_region(self, image, blur_radius: int = 15):
+        """Apply Gaussian blur to an image."""
+        from PIL import ImageFilter
+        return image.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+    def _load_floating_image(self, image_path: str) -> Optional[any]:
+        """Load a floating image from path."""
+        from PIL import Image
+
+        if not image_path:
+            return None
+
+        # Try different base paths
+        possible_paths = [
+            Path(image_path),  # Absolute path
+            self.base_dir / image_path,  # Relative to base
+            self.base_dir / "data" / "images" / image_path,  # In images folder
+            self.base_dir / "data" / "shorts" / "images" / image_path,  # In shorts images
+        ]
+
+        for path in possible_paths:
+            if path.exists():
+                try:
+                    img = Image.open(path).convert("RGBA")
+                    log(f"Loaded floating image: {path}")
+                    return img
+                except Exception as e:
+                    log(f"Error loading floating image {path}: {e}", "WARN")
+
+        log(f"Floating image not found: {image_path}", "WARN")
+        return None
+
+    def _should_mouth_be_open(self, current_time: float, all_words: list) -> bool:
+        """
+        Determine if mouth should be open using syllable-based animation.
+        More natural than simple on/off - simulates actual speech patterns.
+        """
+        lip_config = self.config.get("lip_sync", {})
+        mode = lip_config.get("mode", "syllable")
+
+        # Find current word being spoken
+        current_word = None
+        for word in all_words:
+            if word["start"] <= current_time <= word["end"]:
+                current_word = word
+                break
+
+        if not current_word:
+            return False  # Not speaking
+
+        word_text = current_word.get("text", "")
+        word_start = current_word["start"]
+        word_end = current_word["end"]
+        word_duration = word_end - word_start
+
+        if word_duration <= 0:
+            return False
+
+        # Check for punctuation - close mouth on pauses
+        if lip_config.get("respect_punctuation", True):
+            punctuation = ".,;:!?…"
+            if word_text and word_text[-1] in punctuation:
+                # Close mouth for last 30% of word with punctuation
+                progress = (current_time - word_start) / word_duration
+                if progress > 0.7:
+                    return False
+
+        if mode == "fast":
+            # Old behavior - rapid cycling (10 times/second)
+            cycle_position = (current_time * 10) % 1.0
+            return cycle_position < 0.5
+
+        # Syllable-based mode (default)
+        vowels = lip_config.get("vowels", "aeiouáéíóúAEIOUÁÉÍÓÚ")
+        syllable_duration_ms = lip_config.get("syllable_duration_ms", 150)
+        open_ratio = lip_config.get("open_ratio", 0.6)
+
+        # Count vowels (approximate syllables)
+        vowel_count = sum(1 for c in word_text if c in vowels)
+        syllable_count = max(1, vowel_count)  # At least 1 syllable
+
+        # Calculate syllable timing
+        syllable_duration_sec = syllable_duration_ms / 1000.0
+        total_syllable_time = syllable_count * syllable_duration_sec
+
+        # If word is shorter than syllables would take, compress
+        if total_syllable_time > word_duration:
+            syllable_duration_sec = word_duration / syllable_count
+
+        # Where are we in the word?
+        time_in_word = current_time - word_start
+
+        # Which syllable are we on?
+        current_syllable = int(time_in_word / syllable_duration_sec) if syllable_duration_sec > 0 else 0
+        current_syllable = min(current_syllable, syllable_count - 1)
+
+        # Position within current syllable (0.0 to 1.0)
+        syllable_start = current_syllable * syllable_duration_sec
+        position_in_syllable = (time_in_word - syllable_start) / syllable_duration_sec if syllable_duration_sec > 0 else 0
+        position_in_syllable = max(0, min(1, position_in_syllable))
+
+        # Mouth open for first part of syllable, closed for rest
+        return position_in_syllable < open_ratio
 
     def _get_font(self, size: int):
         """Get or create a font of the specified size."""
@@ -821,10 +1052,24 @@ class ShortVideoRenderer:
         pose_id: str,
         mouth_open: bool,
         caption_text: str,
-        hook_text: str
+        hook_text: str,
+        floating_image: any = None,
+        floating_opacity: float = 0.0,
+        hide_captions_for_floating: bool = False
     ) -> any:
-        """Create a single video frame with the specified character pose and mouth state."""
-        from PIL import Image, ImageDraw
+        """Create a single video frame with the specified character pose and mouth state.
+
+        Args:
+            character: Character name
+            pose_id: Pose identifier
+            mouth_open: Whether mouth should be open
+            caption_text: Text to show as caption
+            hook_text: Text to show at top
+            floating_image: Optional PIL Image to overlay with blur effect
+            floating_opacity: Opacity of the floating image (0.0 to 1.0)
+            hide_captions_for_floating: If True, hide captions when floating image is shown
+        """
+        from PIL import Image, ImageDraw, ImageFilter
         import numpy as np
 
         # Create base frame with background color
@@ -889,8 +1134,54 @@ class ShortVideoRenderer:
                 anchor="mt"  # Middle-Top
             )
 
-        # 3. Draw caption at bottom
-        if caption_text:
+        # 3. Draw floating image with blur effect (if provided)
+        if floating_image is not None and floating_opacity > 0:
+            floating_cfg = self.config.get("floating_images", {})
+            blur_radius = floating_cfg.get("background_blur", 15)
+            size_ratio = floating_cfg.get("size_ratio", 0.6)
+            y_position = floating_cfg.get("y_position", 0.45)
+
+            # Create blurred version of current frame as background
+            frame_with_blur = frame.copy()
+
+            # Apply blur to the entire frame
+            blurred_frame = frame.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+            # Calculate floating image size
+            target_width = int(self.width * size_ratio)
+            img_ratio = floating_image.width / floating_image.height
+            target_height = int(target_width / img_ratio)
+
+            # Resize floating image
+            resized_floating = floating_image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+            # Center horizontally, position vertically
+            float_x = (self.width - target_width) // 2
+            float_y = int(self.height * y_position) - target_height // 2
+
+            # Create composite: blurred background + floating image
+            # First blend original frame with blurred version based on opacity
+            frame = Image.blend(frame, blurred_frame, floating_opacity * 0.7)
+
+            # Paste floating image with alpha
+            if resized_floating.mode == 'RGBA':
+                # Apply opacity to alpha channel
+                r, g, b, a = resized_floating.split()
+                a = a.point(lambda x: int(x * floating_opacity))
+                resized_floating = Image.merge('RGBA', (r, g, b, a))
+                frame.paste(resized_floating, (float_x, float_y), resized_floating)
+            else:
+                # Create temporary RGBA for blending
+                temp = Image.new('RGBA', frame.size, (0, 0, 0, 0))
+                temp.paste(resized_floating, (float_x, float_y))
+                frame = Image.alpha_composite(frame.convert('RGBA'), temp).convert('RGB')
+
+            # Update draw object for new frame
+            draw = ImageDraw.Draw(frame)
+
+        # 4. Draw caption at bottom (optionally hidden during floating image)
+        should_show_caption = caption_text and not (hide_captions_for_floating and floating_opacity > 0.5)
+        if should_show_caption:
             cap_cfg = self.config["captions"]
             font_size = int(self.height * cap_cfg["font_size_ratio"])
             font = self._get_font(font_size)
@@ -984,6 +1275,7 @@ class ShortVideoRenderer:
 
             # Build a flat list of all words with timing
             all_words = []
+            total_words = 0
             for segment in segments:
                 character = segment.get("character", "Analyst")
                 character = CHARACTER_MAPPING.get(character, character)
@@ -1021,17 +1313,93 @@ class ShortVideoRenderer:
             log(f"Creating output container: {output_path}")
             output_container = av.open(output_path, mode='w')
 
-            # Add video stream
-            log("Adding video stream...")
-            video_stream = output_container.add_stream(
-                self.config["video_codec"],
-                rate=self.fps
-            )
-            video_stream.width = self.width
-            video_stream.height = self.height
-            video_stream.pix_fmt = 'yuv420p'
-            video_stream.bit_rate = int(self.config["video_bitrate"].replace("M", "000000"))
-            log(f"Video stream: {self.width}x{self.height}, {self.config['video_codec']}")
+            # Determine codec to use (GPU or CPU)
+            gpu_config = self.config.get("gpu_encoding", {})
+            use_gpu = gpu_config.get("enabled", False)
+            video_codec = self.config["video_codec"]  # Default CPU codec
+
+            if use_gpu:
+                nvidia_codec = gpu_config.get("nvidia_codec", "h264_nvenc")
+                try:
+                    # Try to create GPU stream
+                    log(f"Attempting GPU encoding with {nvidia_codec}...")
+                    video_stream = output_container.add_stream(nvidia_codec, rate=self.fps)
+                    video_stream.width = self.width
+                    video_stream.height = self.height
+                    video_stream.pix_fmt = 'yuv420p'
+                    video_stream.bit_rate = int(self.config["video_bitrate"].replace("M", "000000"))
+
+                    # Set NVENC-specific options
+                    video_stream.options = {
+                        'preset': gpu_config.get("nvidia_preset", "p4"),
+                        'tune': gpu_config.get("nvidia_tune", "hq"),
+                        'rc': 'vbr',  # Variable bitrate
+                    }
+                    video_codec = nvidia_codec
+                    log(f"GPU encoding enabled: {nvidia_codec} (preset: {gpu_config.get('nvidia_preset', 'p4')})")
+                except Exception as gpu_error:
+                    log(f"GPU encoding failed: {gpu_error}", "WARN")
+                    if gpu_config.get("fallback_to_cpu", True):
+                        log("Falling back to CPU encoding...")
+                        # Close and reopen container for CPU
+                        output_container.close()
+                        output_container = av.open(output_path, mode='w')
+                        use_gpu = False
+                    else:
+                        raise gpu_error
+
+            if not use_gpu:
+                # Add CPU video stream
+                log("Using CPU encoding...")
+                video_stream = output_container.add_stream(video_codec, rate=self.fps)
+                video_stream.width = self.width
+                video_stream.height = self.height
+                video_stream.pix_fmt = 'yuv420p'
+                video_stream.bit_rate = int(self.config["video_bitrate"].replace("M", "000000"))
+
+            log(f"Video stream: {self.width}x{self.height}, codec={video_codec}, GPU={use_gpu}")
+
+            # Build captions timeline from all_words
+            captions_timeline = all_words
+
+            # Create helper function to get pose and character for a given time
+            def get_pose_and_character(t: float) -> tuple:
+                """Get the character and pose for a given timestamp."""
+                for seg in segments:
+                    seg_start = seg.get("start", 0)
+                    seg_end = seg.get("end", 0)
+                    if seg_start <= t <= seg_end:
+                        char = seg.get("character", "Analyst")
+                        char = CHARACTER_MAPPING.get(char, char)
+                        # Default pose based on character
+                        pose = f"{char.lower()}_front"
+                        return char, pose
+                # Default to Analyst if no segment matches
+                return "Analyst", "analyst_front"
+
+            # Track poses used and current character
+            poses_used = set()
+            current_character = "Analyst"
+
+            # Setup floating images
+            visual_assets = script_data.get("script", {}).get("visual_assets", [])
+            if not visual_assets:
+                visual_assets = script_data.get("visual_assets", [])
+            log(f"Visual assets found: {len(visual_assets)}")
+
+            floating_image_schedule = self._calculate_floating_image_schedule(audio_duration, visual_assets)
+            log(f"Floating image schedule: {len(floating_image_schedule)} images")
+
+            # Pre-load floating images
+            floating_images_cache = {}
+            for schedule_item in floating_image_schedule:
+                img_path = schedule_item.get("image_path", "")
+                if img_path and img_path not in floating_images_cache:
+                    floating_images_cache[img_path] = self._load_floating_image(img_path)
+            log(f"Pre-loaded {len(floating_images_cache)} floating images")
+
+            floating_cfg = self.config.get("floating_images", {})
+            hide_captions_for_floating = floating_cfg.get("hide_captions", True)
 
             # Render frames
             total_frames = int(audio_duration * self.fps)
@@ -1066,19 +1434,27 @@ class ShortVideoRenderer:
                             current_character = mapped_char
                         break
 
-                # Get character image with mouth animation
+                # Get character image with mouth animation using improved syllable-based lip-sync
                 char_data = character_images.get(current_character)
                 char_img = None
                 if char_data:
                     if is_speaking:
-                        # Alternate mouth open/closed based on time (syllable-like animation)
-                        # Open mouth for first 50% of each syllable cycle (approx 100ms cycles)
-                        cycle_position = (current_time * 10) % 1.0  # 10 cycles per second
-                        mouth_open = cycle_position < 0.5
+                        # Use new syllable-based lip-sync method
+                        mouth_open = self._should_mouth_be_open(current_time, all_words)
                         char_img = char_data["open"] if mouth_open else char_data["closed"]
                     else:
                         # Not speaking - mouth closed
                         char_img = char_data["closed"]
+
+                # Check if we should show a floating image at this time
+                current_floating_image = None
+                current_floating_opacity = 0.0
+                for schedule_item in floating_image_schedule:
+                    if schedule_item["start_time"] <= current_time <= schedule_item["end_time"]:
+                        img_path = schedule_item.get("image_path", "")
+                        current_floating_image = floating_images_cache.get(img_path)
+                        current_floating_opacity = self._get_floating_image_opacity(current_time, schedule_item)
+                        break
 
                 # Create frame
                 frame_array = self._create_frame(
@@ -1086,7 +1462,10 @@ class ShortVideoRenderer:
                     pose_id=pose_id,
                     mouth_open=mouth_open,
                     caption_text=active_caption,
-                    hook_text=hook_text
+                    hook_text=hook_text,
+                    floating_image=current_floating_image,
+                    floating_opacity=current_floating_opacity,
+                    hide_captions_for_floating=hide_captions_for_floating
                 )
 
                 # Encode frame
