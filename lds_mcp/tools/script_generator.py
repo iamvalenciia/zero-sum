@@ -2,12 +2,38 @@
 Script Generator for LDS Short-Form Content
 Creates dialogue scripts featuring Analyst (knowledgeable) and Skeptic (curious learner).
 Character names match ElevenLabs voice mapping for correct audio generation.
+
+STANDARD POSE IDS (from ImageLoader):
+- analyst_close  : Close-up for testimony, whispers
+- analyst_front  : Medium shot for teaching (DEFAULT)
+- analyst_pov    : POV from Skeptic's perspective
+- skeptic_close  : Close-up for realization, emotion
+- skeptic_front  : Medium shot for questions (DEFAULT)
+- skeptic_side   : Side profile for reflection
 """
 
 import json
 import uuid
 from datetime import datetime
 from pathlib import Path
+
+# Import standard pose definitions from ImageLoader
+try:
+    from lds_mcp.tools.image_loader import STANDARD_POSES, STANDARD_CHARACTERS
+except ImportError:
+    # Fallback if ImageLoader not available
+    STANDARD_POSES = {
+        "analyst_close": {"character": "Analyst", "type": "close"},
+        "analyst_front": {"character": "Analyst", "type": "front"},
+        "analyst_pov": {"character": "Analyst", "type": "pov"},
+        "skeptic_close": {"character": "Skeptic", "type": "close"},
+        "skeptic_front": {"character": "Skeptic", "type": "front"},
+        "skeptic_side": {"character": "Skeptic", "type": "side"},
+    }
+    STANDARD_CHARACTERS = {
+        "analyst": type('obj', (object,), {"default_pose": "analyst_front"})(),
+        "skeptic": type('obj', (object,), {"default_pose": "skeptic_front"})(),
+    }
 
 
 # Prompt template for LDS short-form content
@@ -289,3 +315,126 @@ def load_script(script_id: str, scripts_dir: Path) -> dict:
 
     with open(script_path) as f:
         return json.load(f)
+
+
+def validate_script_poses(script_data: dict) -> dict:
+    """
+    Validate that all poses in a script are valid standard poses.
+
+    Returns:
+        dict: Validation result with any issues found
+    """
+    issues = []
+    valid_poses = set(STANDARD_POSES.keys())
+
+    dialogue = script_data.get("script", {}).get("dialogue", [])
+    if not dialogue:
+        dialogue = script_data.get("dialogue", [])
+
+    for idx, line in enumerate(dialogue):
+        character = line.get("character", "")
+        poses = line.get("character_poses", [])
+
+        # Validate character name
+        if character not in ["Analyst", "Skeptic"]:
+            issues.append(f"Line {idx}: Invalid character '{character}'. Must be 'Analyst' or 'Skeptic'.")
+
+        # Validate poses
+        char_key = character.lower() if character in ["Analyst", "Skeptic"] else "analyst"
+        valid_char_poses = [p for p in valid_poses if p.startswith(char_key)]
+
+        for pose_entry in poses:
+            pose_id = pose_entry.get("pose_id", "")
+            if pose_id not in valid_poses:
+                issues.append(f"Line {idx}: Invalid pose_id '{pose_id}'. Valid poses: {valid_char_poses}")
+            elif not pose_id.startswith(char_key):
+                issues.append(f"Line {idx}: Pose '{pose_id}' doesn't match character '{character}'.")
+
+    return {
+        "valid": len(issues) == 0,
+        "issues": issues,
+        "valid_poses": list(valid_poses)
+    }
+
+
+def get_pose_info() -> dict:
+    """
+    Get information about all available poses for script generation.
+
+    Returns:
+        dict: Pose information organized by character
+    """
+    return {
+        "analyst": {
+            "character_name": "Analyst",
+            "default_pose": "analyst_front",
+            "poses": {
+                "analyst_close": {
+                    "description": "Close-up portrait. Use for testimony, profound truths, whispers.",
+                    "emotion_triggers": ["[softly]", "[whispers]", "[reverently]", "[with conviction]"]
+                },
+                "analyst_front": {
+                    "description": "Medium shot facing viewer. Default for teaching and explaining.",
+                    "emotion_triggers": ["[warmly]", "[smiling]", "default"]
+                },
+                "analyst_pov": {
+                    "description": "POV from Skeptic's view. Use when being asked a question.",
+                    "emotion_triggers": ["listening", "responding", "[deep breath]"]
+                }
+            }
+        },
+        "skeptic": {
+            "character_name": "Skeptic",
+            "default_pose": "skeptic_front",
+            "poses": {
+                "skeptic_close": {
+                    "description": "Close-up. Use for realization, strong emotion, confusion.",
+                    "emotion_triggers": ["[realizing]", "[surprised]", "[nervous laugh]"]
+                },
+                "skeptic_front": {
+                    "description": "Medium shot facing viewer. Default for asking questions.",
+                    "emotion_triggers": ["[curious]", "asking", "default"]
+                },
+                "skeptic_side": {
+                    "description": "Side profile. Use for thinking, reflecting, hesitation.",
+                    "emotion_triggers": ["[thoughtfully]", "[pondering]", "[sighs]"]
+                }
+            }
+        }
+    }
+
+
+def suggest_pose_for_text(character: str, text: str) -> str:
+    """
+    Suggest an appropriate pose based on character and dialogue text.
+
+    Args:
+        character: "Analyst" or "Skeptic"
+        text: The dialogue text (with emotion tags)
+
+    Returns:
+        str: Suggested pose_id
+    """
+    char_key = character.lower()
+    text_lower = text.lower()
+
+    # Analyst poses
+    if char_key == "analyst":
+        if any(tag in text_lower for tag in ["[softly]", "[whispers]", "[reverently]", "[with conviction]"]):
+            return "analyst_close"
+        elif any(tag in text_lower for tag in ["[deep breath]", "listening"]):
+            return "analyst_pov"
+        else:
+            return "analyst_front"
+
+    # Skeptic poses
+    elif char_key == "skeptic":
+        if any(tag in text_lower for tag in ["[realizing]", "[surprised]", "[nervous laugh]"]):
+            return "skeptic_close"
+        elif any(tag in text_lower for tag in ["[thoughtfully]", "[pondering]", "[sighs]"]):
+            return "skeptic_side"
+        else:
+            return "skeptic_front"
+
+    # Fallback
+    return f"{char_key}_front"

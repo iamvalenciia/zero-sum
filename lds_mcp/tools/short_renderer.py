@@ -6,19 +6,31 @@ Key Features:
 - Automatic timestamp generation if missing (no manual intervention needed)
 - Unified path management via ProjectManager
 - Legacy path compatibility for CLI tools
+- Lip-sync support using images_catalog.json (open/closed mouth)
+- Pose-based character switching from script
+- Standardized image loading via ImageLoader
 """
 
 import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
+from dataclasses import dataclass
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lds_mcp.tools.project_manager import get_project_manager, ProjectPaths
+from lds_mcp.tools.image_loader import (
+    ImageLoader,
+    get_image_loader,
+    CHARACTER_ALIASES,
+    STANDARD_CHARACTERS,
+    STANDARD_POSES,
+    get_pose_for_emotion
+)
 
 
 # Log file for debugging (always visible)
@@ -105,27 +117,152 @@ SHORT_CONFIG = {
     "video_bitrate": "8M",
     "audio_bitrate": "192k",
     "preset": "medium",
-    "crf": 23
+    "crf": 23,
+
+    # Lip sync
+    "lip_sync": {
+        "enabled": True,
+        "open_threshold": 0.05,  # Minimum word duration to show open mouth
+        "transition_frames": 2   # Frames for smooth transition
+    }
 }
 
-# Pose mapping from new names to existing images
-POSE_MAPPING = {
-    "sister_faith_close": "analyst_close",
-    "sister_faith_front": "analyst_front",
-    "sister_faith_pov": "analyst_pov",
-    "brother_marcus_close": "skeptic_close",
-    "brother_marcus_front": "skeptic_front",
-    "brother_marcus_side": "skeptic_side"
-}
-
-# Character name mapping for dialogue
+# Character name mapping for dialogue (for backward compatibility)
 CHARACTER_MAPPING = {
     "Sister Faith": "Analyst",
     "Brother Marcus": "Skeptic",
-    # Also support reverse mapping
     "Analyst": "Analyst",
-    "Skeptic": "Skeptic"
+    "Skeptic": "Skeptic",
+    "analyst": "Analyst",
+    "skeptic": "Skeptic"
 }
+
+
+@dataclass
+class WordTiming:
+    """Represents a word with its timing and associated character/pose."""
+    word: str
+    start: float
+    end: float
+    character: str
+    pose_id: str
+
+
+@dataclass
+class RenderSegment:
+    """A segment of video to render with specific character and pose."""
+    character: str
+    pose_id: str
+    start_time: float
+    end_time: float
+    words: List[WordTiming]
+
+
+def build_render_timeline(
+    timestamps_data: Dict[str, Any],
+    script_data: Dict[str, Any]
+) -> List[RenderSegment]:
+    """
+    Build a timeline of render segments from timestamps and script data.
+
+    This merges timestamp data (word timings) with script data (pose assignments)
+    to create a complete render plan.
+    """
+    segments = []
+
+    # Extract dialogue from script
+    dialogue = script_data.get("script", {}).get("dialogue", [])
+    if not dialogue and isinstance(script_data.get("dialogue"), list):
+        dialogue = script_data.get("dialogue", [])
+
+    # Build a map of dialogue lines with their poses
+    dialogue_poses = []
+    for line in dialogue:
+        character = line.get("character", "Analyst")
+        character = CHARACTER_MAPPING.get(character, character)
+
+        poses = line.get("character_poses", [])
+        if not poses:
+            # Default pose based on character
+            char_key = CHARACTER_ALIASES.get(character, character.lower())
+            default_pose = STANDARD_CHARACTERS.get(char_key, STANDARD_CHARACTERS["analyst"]).default_pose
+            poses = [{"pose_id": default_pose, "start_word_index": 0, "end_word_index": 999}]
+
+        dialogue_poses.append({
+            "character": character,
+            "poses": poses,
+            "text": line.get("text", "")
+        })
+
+    # Process timestamp segments
+    timestamp_segments = timestamps_data.get("segments", [])
+
+    for seg_idx, segment in enumerate(timestamp_segments):
+        character = segment.get("character", "Analyst")
+        character = CHARACTER_MAPPING.get(character, character)
+
+        # Get pose info from dialogue if available
+        pose_info = None
+        if seg_idx < len(dialogue_poses):
+            pose_info = dialogue_poses[seg_idx]
+            character = pose_info["character"]  # Use character from script
+
+        words = segment.get("words", [])
+        if not words:
+            continue
+
+        # Build word timings with pose assignments
+        word_timings = []
+        for word_idx, word in enumerate(words):
+            word_text = word.get("text", word.get("word", "")).strip()
+            if not word_text:
+                continue
+
+            # Determine pose for this word
+            pose_id = None
+            if pose_info:
+                for pose in pose_info["poses"]:
+                    start_idx = pose.get("start_word_index", 0)
+                    end_idx = pose.get("end_word_index", 999)
+                    if start_idx <= word_idx <= end_idx:
+                        pose_id = pose.get("pose_id")
+                        break
+
+            if not pose_id:
+                # Default pose
+                char_key = CHARACTER_ALIASES.get(character, character.lower())
+                pose_id = STANDARD_CHARACTERS.get(char_key, STANDARD_CHARACTERS["analyst"]).default_pose
+
+            word_timings.append(WordTiming(
+                word=word_text,
+                start=word.get("start", 0),
+                end=word.get("end", 0),
+                character=character,
+                pose_id=pose_id
+            ))
+
+        if word_timings:
+            # Group consecutive words with same character/pose into segments
+            current_segment = None
+            for wt in word_timings:
+                if current_segment is None or current_segment.character != wt.character or current_segment.pose_id != wt.pose_id:
+                    if current_segment:
+                        segments.append(current_segment)
+                    current_segment = RenderSegment(
+                        character=wt.character,
+                        pose_id=wt.pose_id,
+                        start_time=wt.start,
+                        end_time=wt.end,
+                        words=[wt]
+                    )
+                else:
+                    current_segment.end_time = wt.end
+                    current_segment.words.append(wt)
+
+            if current_segment:
+                segments.append(current_segment)
+
+    return segments
 
 
 async def render_short_video(
@@ -212,6 +349,15 @@ async def render_short_video(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{output_filename}.mp4"
 
+    # Validate images catalog
+    try:
+        loader = ImageLoader(base_dir)
+        validation = loader.validate_catalog()
+        if not validation["valid"]:
+            log(f"Image catalog validation failed: {validation}", "WARN")
+    except Exception as e:
+        log(f"Could not validate image catalog: {e}", "WARN")
+
     # Build render plan
     render_plan = {
         "script_id": script_id,
@@ -221,8 +367,8 @@ async def render_short_video(
         "audio_file": str(audio_path),
         "timestamps_file": str(timestamps_path) if has_timestamps else None,
         "output_file": str(output_path),
-        "pose_mapping": POSE_MAPPING,
-        "character_mapping": CHARACTER_MAPPING
+        "character_mapping": CHARACTER_MAPPING,
+        "available_poses": list(STANDARD_POSES.keys())
     }
 
     # Final check for timestamps
@@ -254,19 +400,11 @@ To complete the render, timestamps need to be generated manually:
             "dimensions": f"{SHORT_CONFIG['width']}x{SHORT_CONFIG['height']}",
             "aspect_ratio": "9:16 (vertical)",
             "format": "MP4 (H.264)",
-            "platforms": ["TikTok", "Instagram Reels", "YouTube Shorts"]
+            "platforms": ["TikTok", "Instagram Reels", "YouTube Shorts"],
+            "lip_sync": SHORT_CONFIG["lip_sync"]["enabled"]
         },
         "render_command": f"""
-To render the video, run:
-
-python -c "
-from mcp.tools.short_renderer import execute_render
-import asyncio
-asyncio.run(execute_render('{script_id}', '{hook_text}', '{opening_image or ''}', '{output_filename}'))
-"
-
-Or use the video_handler with short mode:
-python main.py video-render --mode short --script {script_id}
+To render the video, run execute_render with the same parameters.
 """,
         "preview_elements": {
             "hook_text": {
@@ -274,7 +412,7 @@ python main.py video-render --mode short --script {script_id}
                 "position": "top center",
                 "style": "Bold white with black stroke"
             },
-            "characters": "Sister Faith & Brother Marcus (animated)",
+            "characters": "Analyst & Skeptic (with lip-sync)",
             "captions": "Auto-generated from dialogue",
             "audio": str(audio_path)
         }
@@ -348,6 +486,10 @@ async def execute_render(
     Actually execute the video render and create the final MP4 file.
 
     This function creates a short-form video (9:16 vertical format) using PyAV.
+    Features:
+    - Lip-sync animation (open/closed mouth based on word timing)
+    - Pose switching based on script character_poses
+    - Standardized image loading via ImageLoader
     """
     import traceback
 
@@ -355,7 +497,7 @@ async def execute_render(
     clear_log()
 
     log("=" * 60)
-    log("EXECUTE_RENDER STARTED")
+    log("EXECUTE_RENDER STARTED (v2.0 with lip-sync)")
     log(f"Log file location: {LOG_FILE}")
     log(f"script_id: {script_id}")
     log(f"hook_text: {hook_text}")
@@ -474,25 +616,63 @@ async def execute_render(
         segments_count = len(timestamps_data.get("segments", []))
         log(f"Timestamps loaded: {segments_count} segments")
 
+        # Initialize ImageLoader
+        log("Step 3: Initializing ImageLoader...")
+        try:
+            image_loader = ImageLoader(base_dir, preload=True)
+            catalog_summary = image_loader.get_catalog_summary()
+            log(f"ImageLoader initialized: {catalog_summary['total_poses']} poses loaded")
+            for pose_id in catalog_summary['available_poses']:
+                log(f"  - {pose_id}")
+        except Exception as e:
+            log(f"ImageLoader failed: {e}", "ERROR")
+            return {
+                "status": "error",
+                "message": f"Failed to load images catalog: {e}",
+                "action_required": "Ensure data/images/images_catalog.json exists and is valid"
+            }
+
+        # Validate catalog
+        validation = image_loader.validate_catalog()
+        if not validation["valid"]:
+            log(f"Image catalog validation FAILED", "ERROR")
+            for missing in validation["missing_files"]:
+                log(f"  Missing: {missing}", "ERROR")
+            return {
+                "status": "error",
+                "message": "Image catalog validation failed",
+                "missing_files": validation["missing_files"],
+                "load_errors": validation["load_errors"]
+            }
+        log("Image catalog validation OK")
+
+        # Build render timeline
+        log("Step 4: Building render timeline...")
+        render_timeline = build_render_timeline(timestamps_data, script_data)
+        log(f"Render timeline: {len(render_timeline)} segments")
+
         # Prepare output
-        log("Step 3: Preparing output...")
+        log("Step 5: Preparing output...")
         output_dir = shorts_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{output_filename}.mp4"
         log(f"Output path: {output_path}")
 
         # Create renderer and render video
-        log("Step 4: Creating ShortVideoRenderer...")
+        log("Step 6: Creating ShortVideoRenderer...")
         renderer = ShortVideoRenderer(
             config=SHORT_CONFIG,
-            base_dir=base_dir
+            base_dir=base_dir,
+            image_loader=image_loader
         )
         log("Renderer created OK")
 
-        log("Step 5: Starting render...")
+        log("Step 7: Starting render...")
         result = renderer.render(
             audio_path=str(audio_path),
             timestamps_data=timestamps_data,
+            script_data=script_data,
+            render_timeline=render_timeline,
             hook_text=hook_text,
             opening_image=opening_image,
             output_path=str(output_path)
@@ -508,11 +688,13 @@ async def execute_render(
                 "status": "success",
                 "output_path": str(output_path),
                 "duration": result.get("duration", 0),
-                "message": f"Video rendered successfully!",
+                "message": f"Video rendered successfully with lip-sync!",
                 "video_specs": {
                     "dimensions": f"{SHORT_CONFIG['width']}x{SHORT_CONFIG['height']}",
                     "format": "MP4 (H.264)",
-                    "platforms": ["TikTok", "Instagram Reels", "YouTube Shorts"]
+                    "platforms": ["TikTok", "Instagram Reels", "YouTube Shorts"],
+                    "lip_sync": True,
+                    "poses_used": result.get("poses_used", [])
                 }
             }
         else:
@@ -533,13 +715,20 @@ async def execute_render(
 class ShortVideoRenderer:
     """
     Renderer for short-form videos (9:16 vertical format).
-    Uses PyAV for efficient video encoding.
+    Uses PyAV for efficient video encoding and ImageLoader for standardized image access.
+
+    Features:
+    - Lip-sync animation (open/closed mouth)
+    - Pose-based character switching
+    - Hook text overlay
+    - Word-by-word captions
     """
 
-    def __init__(self, config: dict, base_dir: Path):
+    def __init__(self, config: dict, base_dir: Path, image_loader: ImageLoader):
         log("ShortVideoRenderer.__init__ starting...")
         self.config = config
         self.base_dir = Path(base_dir)
+        self.image_loader = image_loader
         self.width = config["width"]
         self.height = config["height"]
         self.fps = config["fps"]
@@ -552,9 +741,11 @@ class ShortVideoRenderer:
         self._font_cache = {}
         log(f"Font path: {self.font_path} (exists: {self.font_path.exists()})")
 
-        # Character images directory
-        self.images_dir = self.base_dir / "data" / "images"
-        log(f"Images dir: {self.images_dir} (exists: {self.images_dir.exists()})")
+        # Lip sync config
+        self.lip_sync_enabled = config.get("lip_sync", {}).get("enabled", True)
+        self.open_threshold = config.get("lip_sync", {}).get("open_threshold", 0.05)
+        log(f"Lip sync: {'enabled' if self.lip_sync_enabled else 'disabled'}")
+
         log("ShortVideoRenderer.__init__ complete")
 
     def _get_font(self, size: int):
@@ -627,11 +818,12 @@ class ShortVideoRenderer:
     def _create_frame(
         self,
         character: str,
+        pose_id: str,
+        mouth_open: bool,
         caption_text: str,
-        hook_text: str,
-        character_image: any = None
+        hook_text: str
     ) -> any:
-        """Create a single video frame."""
+        """Create a single video frame with the specified character pose and mouth state."""
         from PIL import Image, ImageDraw
         import numpy as np
 
@@ -640,6 +832,14 @@ class ShortVideoRenderer:
         draw = ImageDraw.Draw(frame)
 
         # 1. Draw character image (centered in character area)
+        character_image = None
+        if pose_id:
+            character_image = self.image_loader.get_image(pose_id, mouth_open=mouth_open)
+
+        if character_image is None:
+            # Fall back to default pose
+            character_image = self.image_loader.get_default_image(character, mouth_open=mouth_open)
+
         if character_image:
             char_cfg = self.config["character_area"]
             char_y_start = int(self.height * char_cfg["y_start"])
@@ -729,18 +929,21 @@ class ShortVideoRenderer:
         self,
         audio_path: str,
         timestamps_data: dict,
+        script_data: dict,
+        render_timeline: List[RenderSegment],
         hook_text: str,
         opening_image: str,
         output_path: str
     ) -> dict:
         """
-        Render the complete video.
+        Render the complete video with lip-sync and pose switching.
         """
         log("=" * 50)
         log("ShortVideoRenderer.render() STARTING")
         log(f"audio_path: {audio_path}")
         log(f"hook_text: {hook_text}")
         log(f"output_path: {output_path}")
+        log(f"render_timeline segments: {len(render_timeline)}")
         log("=" * 50)
 
         try:
@@ -775,22 +978,24 @@ class ShortVideoRenderer:
             audio_container.close()
             log(f"Audio duration: {audio_duration:.2f}s")
 
-            # Prepare segments timeline
+            # Build word timeline for lip sync
             segments = timestamps_data.get("segments", [])
             log(f"Segments in timestamps: {len(segments)}")
 
-            # Build captions timeline from words
-            captions_timeline = []
-            total_words = 0
+            # Build a flat list of all words with timing
+            all_words = []
             for segment in segments:
+                character = segment.get("character", "Analyst")
+                character = CHARACTER_MAPPING.get(character, character)
+
                 for word in segment.get("words", []):
-                    text = word.get("text", word.get("word", "")).strip()
-                    if text and word.get("start") is not None:
-                        captions_timeline.append({
+                    word_text = word.get("text", word.get("word", "")).strip()
+                    if word_text and word.get("start") is not None:
+                        all_words.append({
                             "start": word["start"],
                             "end": word["end"],
-                            "text": text,
-                            "character": segment.get("character", "")
+                            "text": word_text,
+                            "character": character
                         })
                         total_words += 1
             log(f"Captions timeline built: {total_words} words")
@@ -832,12 +1037,19 @@ class ShortVideoRenderer:
             total_frames = int(audio_duration * self.fps)
             log(f"Starting frame render: {total_frames} frames")
 
-            current_character = "Analyst"
-
             for frame_idx in range(total_frames):
                 current_time = frame_idx / self.fps
 
-                # Find active caption and character
+                # Get character and pose for current time
+                character, pose_id = get_pose_and_character(current_time)
+                poses_used.add(pose_id)
+
+                # Check if currently speaking (for lip sync)
+                mouth_open = False
+                if self.lip_sync_enabled:
+                    mouth_open = self._is_speaking(current_time, all_words)
+
+                # Find active caption word
                 active_caption = ""
                 is_speaking = False
                 word_progress = 0.0
@@ -870,10 +1082,11 @@ class ShortVideoRenderer:
 
                 # Create frame
                 frame_array = self._create_frame(
-                    character=current_character,
+                    character=character,
+                    pose_id=pose_id,
+                    mouth_open=mouth_open,
                     caption_text=active_caption,
-                    hook_text=hook_text,
-                    character_image=char_img
+                    hook_text=hook_text
                 )
 
                 # Encode frame
@@ -934,13 +1147,15 @@ class ShortVideoRenderer:
 
             log("=" * 50)
             log(f"RENDER COMPLETE: {output_path}")
+            log(f"Poses used: {poses_used}")
             log("=" * 50)
 
             return {
                 "status": "success",
                 "output_path": output_path,
                 "duration": audio_duration,
-                "frames": total_frames
+                "frames": total_frames,
+                "poses_used": list(poses_used)
             }
 
         except Exception as e:
