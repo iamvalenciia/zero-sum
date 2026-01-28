@@ -354,6 +354,29 @@ async def list_tools() -> list[Tool]:
             }
         ),
         Tool(
+            name="check_render_status",
+            description="""Check the current status of a background render.
+
+            Returns:
+            - phase: current phase (starting, importing, rendering, complete, error)
+            - message: human-readable status message
+            - progress: percentage complete (0-100)
+            - last_updated: when status was last updated
+            - logs: last 20 lines from render log
+
+            Use this to monitor render progress in real-time.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script_id": {
+                        "type": "string",
+                        "description": "ID of the script being rendered (optional)"
+                    }
+                },
+                "required": []
+            }
+        ),
+        Tool(
             name="list_projects",
             description="""List all current short video projects and their status.""",
             inputSchema={
@@ -770,27 +793,104 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
         if script_id:
             pm.set_current_project(script_id)
 
-        print(f"[MCP_SERVER] Calling execute_render function...", file=sys.stderr, flush=True)
+        # Validate prerequisites BEFORE starting render
+        script_path = SHORTS_DIR / "scripts" / f"{script_id}.json"
+        audio_path = SHORTS_DIR / "audio" / f"{script_id}.mp3"
+
+        if not script_path.exists():
+            return [TextContent(type="text", text=json.dumps({
+                "status": "error",
+                "message": f"Script not found: {script_path}",
+                "action_required": "Create a script first using create_script or save_script"
+            }, indent=2))]
+
+        if not audio_path.exists():
+            return [TextContent(type="text", text=json.dumps({
+                "status": "error",
+                "message": f"Audio not found: {audio_path}",
+                "action_required": "Generate audio first using generate_audio"
+            }, indent=2))]
+
+        # Initialize status file
+        status_file = SHORTS_DIR / "render_status.json"
+        status_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(status_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "phase": "starting",
+                "message": "Launching render process...",
+                "progress": 0,
+                "script_id": script_id,
+                "started_at": datetime.now().isoformat()
+            }, f, indent=2)
+
+        # Launch render worker as separate process
+        # This ensures render continues even if MCP client disconnects
+        import subprocess
+        worker_script = Path(__file__).parent / "tools" / "render_worker.py"
+
+        # Create log file for worker output
+        worker_log = DATA_DIR / "render_worker.log"
 
         try:
-            # Execute the actual render
-            result = await execute_render(
-                script_id=script_id,
-                hook_text=hook_text,
-                opening_image=opening_image,
-                output_filename=output_filename,
-                shorts_dir=SHORTS_DIR
-            )
-            print(f"[MCP_SERVER] execute_render returned: {result.get('status')}", file=sys.stderr, flush=True)
+            # Build command
+            cmd = [
+                sys.executable,  # Use same Python interpreter
+                str(worker_script),
+                script_id,
+                hook_text,
+                opening_image or "",
+                output_filename
+            ]
+
+            print(f"[MCP_SERVER] Launching worker: {' '.join(cmd)}", file=sys.stderr, flush=True)
+
+            # Launch detached process (continues after MCP disconnects)
+            # On Windows, use CREATE_NEW_PROCESS_GROUP and DETACHED_PROCESS
+            if sys.platform == "win32":
+                DETACHED_PROCESS = 0x00000008
+                CREATE_NEW_PROCESS_GROUP = 0x00000200
+                with open(worker_log, "w") as log_f:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=log_f,
+                        stderr=subprocess.STDOUT,
+                        creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+                        close_fds=True
+                    )
+            else:
+                # Unix: use nohup-like approach
+                with open(worker_log, "w") as log_f:
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=log_f,
+                        stderr=subprocess.STDOUT,
+                        start_new_session=True,
+                        close_fds=True
+                    )
+
+            result = {
+                "status": "started",
+                "message": "Render started in background! Use check_render_status to monitor progress.",
+                "script_id": script_id,
+                "pid": process.pid,
+                "status_file": str(status_file),
+                "worker_log": str(worker_log),
+                "instructions": [
+                    "1. Render is now running in the background",
+                    "2. Use check_render_status to see progress and logs",
+                    "3. You can close this chat - render will continue",
+                    "4. Final video will be at: data/shorts/output/" + output_filename + ".mp4"
+                ]
+            }
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
         except Exception as e:
             import traceback
             error_tb = traceback.format_exc()
-            print(f"[MCP_SERVER] execute_render EXCEPTION: {str(e)}", file=sys.stderr, flush=True)
-            print(f"[MCP_SERVER] Traceback:\n{error_tb}", file=sys.stderr, flush=True)
+            print(f"[MCP_SERVER] Failed to launch worker: {e}", file=sys.stderr, flush=True)
             error_result = {
                 "status": "error",
-                "message": str(e),
+                "message": f"Failed to launch render worker: {str(e)}",
                 "traceback": error_tb
             }
             return [TextContent(type="text", text=json.dumps(error_result, indent=2))]
@@ -827,6 +927,38 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
                 "status": "error",
                 "message": str(e)
             }
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "check_render_status":
+        # Check status of background render
+        status_file = SHORTS_DIR / "render_status.json"
+        log_file = DATA_DIR / "render_log.txt"
+
+        result = {
+            "status": "unknown",
+            "phase": "unknown",
+            "message": "No render status available"
+        }
+
+        # Read status file if exists
+        try:
+            if status_file.exists():
+                with open(status_file, "r", encoding="utf-8") as f:
+                    result = json.load(f)
+                result["status"] = "found"
+        except Exception as e:
+            result["status_error"] = str(e)
+
+        # Always include recent logs
+        try:
+            if log_file.exists():
+                with open(log_file, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                result["logs"] = "".join(lines[-30:])  # Last 30 lines
+                result["log_lines_total"] = len(lines)
+        except Exception as e:
+            result["log_error"] = str(e)
 
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 

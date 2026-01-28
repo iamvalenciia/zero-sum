@@ -64,6 +64,28 @@ def clear_log():
         pass
 
 
+# Status file for tracking render progress
+STATUS_FILE = Path(__file__).parent.parent.parent / "data" / "shorts" / "render_status.json"
+
+
+def update_render_status(phase: str, message: str, progress: float = 0, extra: dict = None):
+    """Update the render status file for real-time progress tracking."""
+    try:
+        STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        status = {
+            "phase": phase,
+            "message": message,
+            "progress": round(progress, 1),
+            "last_updated": datetime.now().isoformat(),
+        }
+        if extra:
+            status.update(extra)
+        with open(STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(status, f, indent=2)
+    except Exception:
+        pass
+
+
 # Short-form video configuration
 SHORT_CONFIG = {
     # Video dimensions (9:16 vertical)
@@ -523,6 +545,7 @@ async def execute_render(
 
     # Clear log file and start fresh
     clear_log()
+    update_render_status("starting", "Initializing render...", 0)
 
     log("=" * 60)
     log("EXECUTE_RENDER STARTED (v2.0 with lip-sync)")
@@ -696,15 +719,33 @@ async def execute_render(
         log("Renderer created OK")
 
         log("Step 7: Starting render...")
-        result = renderer.render(
-            audio_path=str(audio_path),
-            timestamps_data=timestamps_data,
-            script_data=script_data,
-            render_timeline=render_timeline,
-            hook_text=hook_text,
-            opening_image=opening_image,
-            output_path=str(output_path)
-        )
+        update_render_status("rendering", "Starting video render...", 5, {"total_frames": "calculating..."})
+        # Run the CPU-intensive render in a thread pool to avoid blocking MCP event loop
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context (MCP server), use thread pool
+            result = await asyncio.to_thread(
+                renderer.render,
+                audio_path=str(audio_path),
+                timestamps_data=timestamps_data,
+                script_data=script_data,
+                render_timeline=render_timeline,
+                hook_text=hook_text,
+                opening_image=opening_image,
+                output_path=str(output_path)
+            )
+        except RuntimeError:
+            # No running event loop (direct CLI execution)
+            result = renderer.render(
+                audio_path=str(audio_path),
+                timestamps_data=timestamps_data,
+                script_data=script_data,
+                render_timeline=render_timeline,
+                hook_text=hook_text,
+                opening_image=opening_image,
+                output_path=str(output_path)
+            )
         log(f"Render complete. Status: {result.get('status')}")
 
         if result["status"] == "success":
@@ -738,6 +779,37 @@ async def execute_render(
             "message": str(e),
             "traceback": error_tb
         }
+
+
+def execute_render_sync(
+    script_id: str,
+    hook_text: str,
+    opening_image: str = "",
+    output_filename: str = "short_video",
+    shorts_dir: Path = None
+) -> dict:
+    """
+    Synchronous version of execute_render for use in background worker process.
+    This runs the entire render without any async overhead.
+    """
+    import asyncio
+
+    # Create a new event loop and run the async function
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(
+            execute_render(
+                script_id=script_id,
+                hook_text=hook_text,
+                opening_image=opening_image,
+                output_filename=output_filename,
+                shorts_dir=shorts_dir
+            )
+        )
+        return result
+    finally:
+        loop.close()
 
 
 class ShortVideoRenderer:
@@ -1311,6 +1383,7 @@ class ShortVideoRenderer:
 
             # Create output container
             log(f"Creating output container: {output_path}")
+            output_container = None  # Initialize to None for proper cleanup
             output_container = av.open(output_path, mode='w')
 
             # Determine codec to use (GPU or CPU)
@@ -1475,12 +1548,20 @@ class ShortVideoRenderer:
                 for packet in video_stream.encode(frame):
                     output_container.mux(packet)
 
-                # Progress indicator every 10 seconds
-                if frame_idx % (self.fps * 10) == 0:
+                # Progress indicator every 5 seconds (more frequent updates)
+                if frame_idx % (self.fps * 5) == 0:
                     progress = (frame_idx / total_frames) * 100
                     log(f"Render progress: {progress:.1f}% ({frame_idx}/{total_frames})")
+                    # Update status file for real-time tracking
+                    update_render_status(
+                        "rendering",
+                        f"Rendering frame {frame_idx}/{total_frames}",
+                        5 + (progress * 0.85),  # 5-90% for rendering phase
+                        {"frame": frame_idx, "total_frames": total_frames, "percent": round(progress, 1)}
+                    )
 
             log("Flushing video encoder...")
+            update_render_status("encoding", "Flushing video encoder...", 90)
             # Flush video encoder
             for packet in video_stream.encode():
                 output_container.mux(packet)
@@ -1490,6 +1571,7 @@ class ShortVideoRenderer:
 
             # Now mux audio with video using ffmpeg
             log("Adding audio track with FFmpeg...")
+            update_render_status("muxing", "Adding audio track...", 92)
             temp_output = output_path.replace(".mp4", "_temp.mp4")
             os.rename(output_path, temp_output)
 
@@ -1506,7 +1588,7 @@ class ShortVideoRenderer:
             ]
             log(f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
 
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
 
             if result.returncode != 0:
                 log(f"FFmpeg FAILED: {result.stderr}", "ERROR")
@@ -1529,6 +1611,12 @@ class ShortVideoRenderer:
             log(f"Poses used: {poses_used}")
             log("=" * 50)
 
+            update_render_status("complete", f"Video rendered successfully!", 100, {
+                "output_path": output_path,
+                "duration": audio_duration,
+                "frames": total_frames
+            })
+
             return {
                 "status": "success",
                 "output_path": output_path,
@@ -1542,6 +1630,14 @@ class ShortVideoRenderer:
             error_tb = traceback.format_exc()
             log(f"RENDER EXCEPTION: {str(e)}", "ERROR")
             log(f"Traceback:\n{error_tb}", "ERROR")
+            update_render_status("error", f"Render failed: {str(e)}", 0, {"error": str(e)})
+            # Ensure container is closed on error to avoid file handle leaks
+            if output_container is not None:
+                try:
+                    output_container.close()
+                    log("Output container closed after error")
+                except Exception:
+                    pass
             return {
                 "status": "error",
                 "message": str(e),
