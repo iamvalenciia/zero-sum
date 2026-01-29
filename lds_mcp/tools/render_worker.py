@@ -9,6 +9,7 @@ disconnects.
 Usage:
     python render_worker.py <script_id> <hook_text> <opening_image> <output_filename>
 """
+import os
 import sys
 import asyncio
 import json
@@ -50,7 +51,7 @@ def main():
         # Update status to indicate worker has started
         update_render_status("worker_started", "Render worker process started", 1, {
             "script_id": script_id,
-            "worker_pid": str(os.getpid()) if 'os' in dir() else "unknown"
+            "worker_pid": os.getpid()
         })
 
         # Run the async render function
@@ -102,5 +103,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import os
     main()

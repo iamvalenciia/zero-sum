@@ -377,6 +377,32 @@ async def list_tools() -> list[Tool]:
             }
         ),
         Tool(
+            name="stop_render",
+            description="""Stop a running render process.
+
+            Use this if:
+            - Render is taking too long
+            - You need to make changes and re-render
+            - Something went wrong
+
+            Requires the PID from execute_render or check_render_status.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pid": {
+                        "type": "integer",
+                        "description": "Process ID of the render worker to stop"
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force kill (SIGKILL) instead of graceful stop",
+                        "default": False
+                    }
+                },
+                "required": ["pid"]
+            }
+        ),
+        Tool(
             name="list_projects",
             description="""List all current short video projects and their status.""",
             inputSchema={
@@ -868,20 +894,53 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
                         close_fds=True
                     )
 
-            result = {
-                "status": "started",
-                "message": "Render started in background! Use check_render_status to monitor progress.",
-                "script_id": script_id,
-                "pid": process.pid,
-                "status_file": str(status_file),
-                "worker_log": str(worker_log),
-                "instructions": [
-                    "1. Render is now running in the background",
-                    "2. Use check_render_status to see progress and logs",
-                    "3. You can close this chat - render will continue",
-                    "4. Final video will be at: data/shorts/output/" + output_filename + ".mp4"
-                ]
-            }
+            # Verify process actually started by checking if it's running
+            import time
+            time.sleep(0.5)  # Brief pause to let process initialize
+
+            # Check if process is still running (poll() returns None if running)
+            process_running = process.poll() is None
+
+            # Also check if status file was updated by worker
+            status_updated = False
+            try:
+                if status_file.exists():
+                    with open(status_file, "r", encoding="utf-8") as f:
+                        current_status = json.load(f)
+                    status_updated = current_status.get("phase") == "worker_started"
+            except:
+                pass
+
+            if process_running:
+                result = {
+                    "status": "render_running",
+                    "message": f"Video render is now running in background (PID: {process.pid}). This will take several minutes.",
+                    "script_id": script_id,
+                    "pid": process.pid,
+                    "process_verified": True,
+                    "status_file": str(status_file),
+                    "worker_log": str(worker_log),
+                    "output_location": f"data/shorts/output/{output_filename}.mp4",
+                    "important": "The render IS running. Use check_render_status to monitor progress.",
+                    "instructions": [
+                        "1. Render is CONFIRMED running in background",
+                        "2. Use check_render_status to see progress and logs",
+                        "3. You can close this chat - render will continue",
+                        f"4. Final video will be at: data/shorts/output/{output_filename}.mp4",
+                        f"5. To stop render if needed: kill process {process.pid}"
+                    ]
+                }
+            else:
+                # Process exited immediately - check for error
+                result = {
+                    "status": "error",
+                    "message": "Render process exited immediately. Check worker log for details.",
+                    "script_id": script_id,
+                    "exit_code": process.returncode,
+                    "worker_log": str(worker_log),
+                    "hint": "Try running manually: python lds_mcp/tools/render_worker.py ..."
+                }
+
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         except Exception as e:
@@ -959,6 +1018,66 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
                 result["log_lines_total"] = len(lines)
         except Exception as e:
             result["log_error"] = str(e)
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    elif name == "stop_render":
+        pid = arguments.get("pid")
+        force = arguments.get("force", False)
+
+        if not pid:
+            return [TextContent(type="text", text=json.dumps({
+                "status": "error",
+                "message": "PID is required. Get it from check_render_status or execute_render response."
+            }, indent=2))]
+
+        try:
+            import signal
+
+            if sys.platform == "win32":
+                # Windows: use taskkill
+                import subprocess
+                if force:
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                else:
+                    subprocess.run(["taskkill", "/PID", str(pid)], capture_output=True)
+            else:
+                # Unix: send signal
+                os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+
+            # Update status file
+            status_file = SHORTS_DIR / "render_status.json"
+            with open(status_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "phase": "stopped",
+                    "message": f"Render stopped by user (PID: {pid})",
+                    "stopped_at": datetime.now().isoformat()
+                }, f, indent=2)
+
+            result = {
+                "status": "success",
+                "message": f"Render process {pid} has been stopped.",
+                "pid": pid,
+                "force": force
+            }
+        except ProcessLookupError:
+            result = {
+                "status": "not_found",
+                "message": f"Process {pid} not found. It may have already completed or been stopped.",
+                "pid": pid
+            }
+        except PermissionError:
+            result = {
+                "status": "error",
+                "message": f"Permission denied to stop process {pid}.",
+                "pid": pid
+            }
+        except Exception as e:
+            result = {
+                "status": "error",
+                "message": f"Failed to stop process: {str(e)}",
+                "pid": pid
+            }
 
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
