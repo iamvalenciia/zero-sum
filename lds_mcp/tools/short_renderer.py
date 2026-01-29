@@ -104,10 +104,10 @@ SHORT_CONFIG = {
     # Hook text (top of video)
     "hook_text": {
         "y_position": 0.08,  # 8% from top
-        "font_size_ratio": 0.035,  # 3.5% of height
+        "font_size_ratio": 0.07,  # 7% of height (doubled for better visibility as thumbnail)
         "color": (255, 255, 255),
         "stroke_color": (0, 0, 0),
-        "stroke_width": 4,
+        "stroke_width": 8,  # Increased stroke for larger text
         "max_width_ratio": 0.85
     },
 
@@ -147,7 +147,9 @@ SHORT_CONFIG = {
 
     # Audio
     "narration_volume": 1.0,
-    "music_volume": 0.15,  # Lower for shorts
+    "music_volume": 0.12,  # Background music volume (ambient, not distracting)
+    "music_path": "data/audio/music/Frolic-Es-Jammy-Jams.mp3",  # Nature/piano ambient music
+    "normalize_music": True,  # Normalize music volume for consistent levels
 
     # Encoding - GPU acceleration
     "gpu_encoding": {
@@ -164,12 +166,12 @@ SHORT_CONFIG = {
     "preset": "medium",
     "crf": 23,
 
-    # Lip sync - improved syllable-based animation
+    # Lip sync - improved syllable-based animation (anime-style)
     "lip_sync": {
         "enabled": True,
         "mode": "syllable",            # "syllable" for natural, "fast" for old behavior
-        "syllable_duration_ms": 150,   # Duration of each syllable cycle (ms)
-        "open_ratio": 0.6,             # Mouth open for 60% of syllable
+        "syllable_duration_ms": 280,   # Duration of each syllable cycle (ms) - slower for anime style
+        "open_ratio": 0.45,            # Mouth open for 45% of syllable - more natural pauses
         "pause_threshold_ms": 200,     # Pause longer than this = mouth closed
         "vowels": "aeiouáéíóúAEIOUÁÉÍÓÚ",  # Characters that trigger mouth open
         "respect_punctuation": True,   # Close mouth on . , ; : ! ?
@@ -887,9 +889,20 @@ class ShortVideoRenderer:
                 start_time = asset["start_time"]
                 end_time = asset["end_time"]
 
-                # Calculate fade times
-                fade_in_end = start_time + fade_in
-                fade_out_start = end_time - fade_out
+                # Opening images should appear instantly (no fade in) at frame 0
+                is_opening = asset.get("is_opening", False)
+
+                # Calculate fade times - opening images have no fade_in for instant appearance
+                if is_opening:
+                    # Opening image: instant appearance (fade_in_end = start_time)
+                    asset_fade_in = 0.0
+                    asset_fade_out = fade_out
+                else:
+                    asset_fade_in = fade_in
+                    asset_fade_out = fade_out
+
+                fade_in_end = start_time + asset_fade_in
+                fade_out_start = end_time - asset_fade_out
 
                 # Ensure fade times don't overlap
                 if fade_in_end > fade_out_start:
@@ -904,10 +917,11 @@ class ShortVideoRenderer:
                     "start_time": start_time,
                     "end_time": end_time,
                     "fade_in_end": fade_in_end,
-                    "fade_out_start": fade_out_start
+                    "fade_out_start": fade_out_start,
+                    "is_opening": is_opening
                 })
 
-                log(f"Scheduled floating image '{asset.get('visual_asset_id', '')}': {start_time:.1f}s - {end_time:.1f}s")
+                log(f"Scheduled floating image '{asset.get('visual_asset_id', '')}': {start_time:.1f}s - {end_time:.1f}s (opening={is_opening})")
 
             else:
                 # Fallback: use legacy uniform distribution
@@ -1413,7 +1427,8 @@ class ShortVideoRenderer:
         hook_text: str,
         floating_image: any = None,
         floating_opacity: float = 0.0,
-        hide_captions_for_floating: bool = False
+        hide_captions_for_floating: bool = False,
+        is_opening_image: bool = False
     ) -> any:
         """Create a single video frame with the specified character pose and mouth state.
 
@@ -1426,6 +1441,7 @@ class ShortVideoRenderer:
             floating_image: Optional PIL Image to overlay with blur effect
             floating_opacity: Opacity of the floating image (0.0 to 1.0)
             hide_captions_for_floating: If True, hide captions when floating image is shown
+            is_opening_image: If True, skip blur effect for clean thumbnail/first frame
         """
         from PIL import Image, ImageDraw, ImageFilter
         import numpy as np
@@ -1473,8 +1489,9 @@ class ShortVideoRenderer:
             else:
                 frame.paste(resized, (x, y))
 
-        # 2. Draw hook text at top
-        if hook_text:
+        # 2. Draw hook text at top (BEFORE blur for normal images, AFTER for opening)
+        # For opening image: skip drawing here, will draw after floating image (no blur on title)
+        if hook_text and not is_opening_image:
             hook_cfg = self.config["hook_text"]
             font_size = int(self.height * hook_cfg["font_size_ratio"])
             font = self._get_font(font_size)
@@ -1493,17 +1510,12 @@ class ShortVideoRenderer:
             )
 
         # 3. Draw floating image with blur effect (if provided)
+        # For opening image: NO blur effect to keep clean thumbnail/first frame
         if floating_image is not None and floating_opacity > 0:
             floating_cfg = self.config.get("floating_images", {})
             blur_radius = floating_cfg.get("background_blur", 15)
             size_ratio = floating_cfg.get("size_ratio", 0.6)
             y_position = floating_cfg.get("y_position", 0.45)
-
-            # Create blurred version of current frame as background
-            frame_with_blur = frame.copy()
-
-            # Apply blur to the entire frame
-            blurred_frame = frame.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 
             # Calculate floating image size
             target_width = int(self.width * size_ratio)
@@ -1517,9 +1529,14 @@ class ShortVideoRenderer:
             float_x = (self.width - target_width) // 2
             float_y = int(self.height * y_position) - target_height // 2
 
-            # Create composite: blurred background + floating image
-            # First blend original frame with blurred version based on opacity
-            frame = Image.blend(frame, blurred_frame, floating_opacity * 0.7)
+            # Apply blur ONLY for non-opening images (keep opening clean for thumbnail)
+            if not is_opening_image:
+                # Create blurred version of current frame as background
+                blurred_frame = frame.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+                # Create composite: blurred background + floating image
+                # First blend original frame with blurred version based on opacity
+                frame = Image.blend(frame, blurred_frame, floating_opacity * 0.7)
 
             # Paste floating image with alpha
             if resized_floating.mode == 'RGBA':
@@ -1536,6 +1553,25 @@ class ShortVideoRenderer:
 
             # Update draw object for new frame
             draw = ImageDraw.Draw(frame)
+
+        # 2b. Draw hook text AFTER floating image for opening (clean, no blur)
+        if hook_text and is_opening_image:
+            hook_cfg = self.config["hook_text"]
+            font_size = int(self.height * hook_cfg["font_size_ratio"])
+            font = self._get_font(font_size)
+
+            y_pos = int(self.height * hook_cfg["y_position"])
+
+            # Draw with stroke for visibility (crisp, no blur)
+            self._draw_text_with_stroke(
+                draw, hook_text, font,
+                x=self.width // 2,
+                y=y_pos,
+                text_color=tuple(hook_cfg["color"]),
+                stroke_color=tuple(hook_cfg["stroke_color"]),
+                stroke_width=hook_cfg["stroke_width"],
+                anchor="mt"  # Middle-Top
+            )
 
         # 4. Draw caption at bottom (optionally hidden during floating image)
         should_show_caption = caption_text and not (hide_captions_for_floating and floating_opacity > 0.5)
@@ -1808,11 +1844,13 @@ class ShortVideoRenderer:
                 # Check if we should show a floating image at this time
                 current_floating_image = None
                 current_floating_opacity = 0.0
+                current_is_opening = False
                 for schedule_item in floating_image_schedule:
                     if schedule_item["start_time"] <= current_time <= schedule_item["end_time"]:
                         img_path = schedule_item.get("image_path", "")
                         current_floating_image = floating_images_cache.get(img_path)
                         current_floating_opacity = self._get_floating_image_opacity(current_time, schedule_item)
+                        current_is_opening = schedule_item.get("is_opening", False)
                         break
 
                 # Create frame
@@ -1824,7 +1862,8 @@ class ShortVideoRenderer:
                     hook_text=hook_text,
                     floating_image=current_floating_image,
                     floating_opacity=current_floating_opacity,
-                    hide_captions_for_floating=hide_captions_for_floating
+                    hide_captions_for_floating=hide_captions_for_floating,
+                    is_opening_image=current_is_opening
                 )
 
                 # Encode frame
@@ -1855,23 +1894,59 @@ class ShortVideoRenderer:
             output_container.close()
             log("Video container closed")
 
-            # Now mux audio with video using ffmpeg
+            # Now mux audio with video using ffmpeg (with background music mixing)
             log("Adding audio track with FFmpeg...")
             update_render_status("muxing", "Adding audio track...", 92)
             temp_output = output_path.replace(".mp4", "_temp.mp4")
             os.rename(output_path, temp_output)
 
             import subprocess
-            ffmpeg_cmd = [
-                "ffmpeg", "-y",
-                "-i", temp_output,
-                "-i", audio_path,
-                "-c:v", "copy",
-                "-c:a", "aac",
-                "-b:a", self.config["audio_bitrate"],
-                "-shortest",
-                output_path
-            ]
+
+            # Check if background music exists
+            music_path = self.base_dir / self.config.get("music_path", "data/audio/music/Frolic-Es-Jammy-Jams.mp3")
+            music_volume = self.config.get("music_volume", 0.12)
+            narration_volume = self.config.get("narration_volume", 1.0)
+
+            if music_path.exists():
+                log(f"Mixing background music: {music_path} at volume {music_volume}")
+                # FFmpeg filter to mix narration and background music
+                # - Loop music to match narration duration
+                # - Apply volume levels
+                # - Normalize music for consistent volume
+                filter_complex = (
+                    f"[1:a]volume={narration_volume}[narration];"
+                    f"[2:a]aloop=loop=-1:size=2e+09,volume={music_volume},dynaudnorm=f=150:g=15[music];"
+                    f"[narration][music]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                )
+
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", temp_output,
+                    "-i", audio_path,
+                    "-i", str(music_path),
+                    "-filter_complex", filter_complex,
+                    "-map", "0:v",
+                    "-map", "[aout]",
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-b:a", self.config["audio_bitrate"],
+                    "-shortest",
+                    output_path
+                ]
+            else:
+                log(f"Background music not found at {music_path}, using narration only", "WARN")
+                # Fallback: just mux narration without music
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", temp_output,
+                    "-i", audio_path,
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-b:a", self.config["audio_bitrate"],
+                    "-shortest",
+                    output_path
+                ]
+
             log(f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
 
             result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
