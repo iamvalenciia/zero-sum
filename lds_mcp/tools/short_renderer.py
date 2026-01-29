@@ -129,7 +129,7 @@ SHORT_CONFIG = {
         "fade_out": 0.5
     },
 
-    # Floating images (visual assets)
+    # Floating images (visual assets / illustrations)
     "floating_images": {
         "enabled": True,
         "min_interval_seconds": 15,    # Minimum seconds between images
@@ -170,12 +170,14 @@ SHORT_CONFIG = {
     "lip_sync": {
         "enabled": True,
         "mode": "syllable",            # "syllable" for natural, "fast" for old behavior
-        "syllable_duration_ms": 280,   # Duration of each syllable cycle (ms) - slower for anime style
-        "open_ratio": 0.45,            # Mouth open for 45% of syllable - more natural pauses
-        "pause_threshold_ms": 200,     # Pause longer than this = mouth closed
+        "syllable_duration_ms": 80,    # Duration of each syllable cycle (ms) - faster for natural speech
+        "open_ratio": 0.55,            # Mouth open for 55% of syllable (slightly faster close)
+        "min_syllable_ms": 60,         # Minimum syllable duration (prevents too fast)
+        "max_syllable_ms": 120,        # Maximum syllable duration (prevents too slow)
+        "pause_threshold_ms": 150,     # Pause longer than this = mouth closed
         "vowels": "aeiouáéíóúAEIOUÁÉÍÓÚ",  # Characters that trigger mouth open
         "respect_punctuation": True,   # Close mouth on . , ; : ! ?
-        "transition_frames": 2         # Frames for smooth transition
+        "transition_frames": 1         # Frames for smooth transition (reduced for snappier animation)
     }
 }
 
@@ -1283,6 +1285,12 @@ class ShortVideoRenderer:
         """
         Determine if mouth should be open using syllable-based animation.
         More natural than simple on/off - simulates actual speech patterns.
+
+        Improved algorithm:
+        - Each word gets 1 mouth cycle per syllable (counted via vowels)
+        - Minimum 1 cycle per word, even for short words
+        - Cycles are distributed evenly across the word duration
+        - Mouth opens/closes faster for more natural speech appearance
         """
         lip_config = self.config.get("lip_sync", {})
         mode = lip_config.get("mode", "syllable")
@@ -1309,46 +1317,63 @@ class ShortVideoRenderer:
         if lip_config.get("respect_punctuation", True):
             punctuation = ".,;:!?…"
             if word_text and word_text[-1] in punctuation:
-                # Close mouth for last 30% of word with punctuation
+                # Close mouth for last 20% of word with punctuation (faster close)
                 progress = (current_time - word_start) / word_duration
-                if progress > 0.7:
+                if progress > 0.8:
                     return False
 
         if mode == "fast":
-            # Old behavior - rapid cycling (10 times/second)
-            cycle_position = (current_time * 10) % 1.0
+            # Rapid cycling mode (12 times/second for faster lip movement)
+            cycle_position = (current_time * 12) % 1.0
             return cycle_position < 0.5
 
-        # Syllable-based mode (default)
+        # Syllable-based mode (default) - IMPROVED
         vowels = lip_config.get("vowels", "aeiouáéíóúAEIOUÁÉÍÓÚ")
-        syllable_duration_ms = lip_config.get("syllable_duration_ms", 150)
-        open_ratio = lip_config.get("open_ratio", 0.6)
+        open_ratio = lip_config.get("open_ratio", 0.55)
+        min_syllable_ms = lip_config.get("min_syllable_ms", 60)
+        max_syllable_ms = lip_config.get("max_syllable_ms", 120)
 
         # Count vowels (approximate syllables)
+        # Also count consonant clusters as potential syllable breaks
         vowel_count = sum(1 for c in word_text if c in vowels)
-        syllable_count = max(1, vowel_count)  # At least 1 syllable
+        syllable_count = max(1, vowel_count)
 
-        # Calculate syllable timing
-        syllable_duration_sec = syllable_duration_ms / 1000.0
-        total_syllable_time = syllable_count * syllable_duration_sec
-
-        # If word is shorter than syllables would take, compress
-        if total_syllable_time > word_duration:
-            syllable_duration_sec = word_duration / syllable_count
-
-        # Where are we in the word?
+        # For single-syllable words, ensure at least one full open/close cycle
+        # For multi-syllable words, match cycles to syllables
         time_in_word = current_time - word_start
 
-        # Which syllable are we on?
+        # Calculate actual syllable duration based on word duration
+        # Each syllable gets equal time within the word
+        syllable_duration_sec = word_duration / syllable_count
+
+        # Clamp syllable duration to reasonable bounds
+        min_dur = min_syllable_ms / 1000.0
+        max_dur = max_syllable_ms / 1000.0
+
+        # If natural syllable duration is too slow, add more cycles
+        if syllable_duration_sec > max_dur:
+            # Add extra cycles to make animation faster
+            extra_cycles = int(syllable_duration_sec / max_dur)
+            syllable_count = syllable_count * max(1, extra_cycles)
+            syllable_duration_sec = word_duration / syllable_count
+
+        # If natural syllable duration is too fast, slow it down
+        if syllable_duration_sec < min_dur and syllable_count > 1:
+            # Reduce cycles to prevent too-fast animation
+            syllable_count = max(1, int(word_duration / min_dur))
+            syllable_duration_sec = word_duration / syllable_count
+
+        # Which syllable cycle are we in?
         current_syllable = int(time_in_word / syllable_duration_sec) if syllable_duration_sec > 0 else 0
         current_syllable = min(current_syllable, syllable_count - 1)
 
         # Position within current syllable (0.0 to 1.0)
-        syllable_start = current_syllable * syllable_duration_sec
-        position_in_syllable = (time_in_word - syllable_start) / syllable_duration_sec if syllable_duration_sec > 0 else 0
-        position_in_syllable = max(0, min(1, position_in_syllable))
+        syllable_start_time = current_syllable * syllable_duration_sec
+        position_in_syllable = (time_in_word - syllable_start_time) / syllable_duration_sec if syllable_duration_sec > 0 else 0
+        position_in_syllable = max(0.0, min(1.0, position_in_syllable))
 
-        # Mouth open for first part of syllable, closed for rest
+        # Mouth open for first portion of syllable, closed for rest
+        # This creates the open-close-open-close pattern for each syllable
         return position_in_syllable < open_ratio
 
     def _get_font(self, size: int):
@@ -1460,28 +1485,22 @@ class ShortVideoRenderer:
             character_image = self.image_loader.get_default_image(character, mouth_open=mouth_open)
 
         if character_image:
-            char_cfg = self.config["character_area"]
-            char_y_start = int(self.height * char_cfg["y_start"])
-            char_y_end = int(self.height * char_cfg["y_end"])
-            char_width = int(self.width * char_cfg["width_ratio"])
-            char_height = char_y_end - char_y_start
+            # Character images should COVER the entire canvas (1080x1920)
+            # Using "cover" mode: scale and crop to fill, maintaining aspect ratio
+            from PIL import ImageOps
 
-            # Resize character to fit
-            img_ratio = character_image.width / character_image.height
-            target_ratio = char_width / char_height
+            # Use ImageOps.fit for "cover" behavior - scales and crops to exact dimensions
+            # The image will fill the entire canvas, cropping if necessary to maintain aspect ratio
+            resized = ImageOps.fit(
+                character_image,
+                (self.width, self.height),
+                method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.5)  # Center the crop horizontally and vertically
+            )
 
-            if img_ratio > target_ratio:
-                new_width = char_width
-                new_height = int(char_width / img_ratio)
-            else:
-                new_height = char_height
-                new_width = int(char_height * img_ratio)
-
-            resized = character_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-            # Center in character area
-            x = (self.width - new_width) // 2
-            y = char_y_start + (char_height - new_height) // 2
+            # Position at origin (0,0) since image now covers full canvas
+            x = 0
+            y = 0
 
             # Paste with alpha if available
             if resized.mode == 'RGBA':
@@ -1904,7 +1923,7 @@ class ShortVideoRenderer:
 
             # Check if background music exists
             music_path = self.base_dir / self.config.get("music_path", "data/audio/music/Frolic-Es-Jammy-Jams.mp3")
-            music_volume = self.config.get("music_volume", 0.12)
+            music_volume = self.config.get("music_volume", 0.15)
             narration_volume = self.config.get("narration_volume", 1.0)
 
             if music_path.exists():
