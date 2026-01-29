@@ -104,10 +104,10 @@ SHORT_CONFIG = {
     # Hook text (top of video)
     "hook_text": {
         "y_position": 0.08,  # 8% from top
-        "font_size_ratio": 0.07,  # 7% of height (doubled for better visibility as thumbnail)
+        "font_size_ratio": 0.035,  # 3.5% of height (reduced by half)
         "color": (255, 255, 255),
         "stroke_color": (0, 0, 0),
-        "stroke_width": 8,  # Increased stroke for larger text
+        "stroke_width": 4,  # Reduced stroke for smaller text
         "max_width_ratio": 0.85
     },
 
@@ -1529,7 +1529,8 @@ class ShortVideoRenderer:
             )
 
         # 3. Draw floating image with blur effect (if provided)
-        # For opening image: NO blur effect to keep clean thumbnail/first frame
+        # ALWAYS blur the character background when showing a floating image (including opening)
+        # The illustration and title should be clear, but the character behind is blurred
         if floating_image is not None and floating_opacity > 0:
             floating_cfg = self.config.get("floating_images", {})
             blur_radius = floating_cfg.get("background_blur", 15)
@@ -1548,14 +1549,14 @@ class ShortVideoRenderer:
             float_x = (self.width - target_width) // 2
             float_y = int(self.height * y_position) - target_height // 2
 
-            # Apply blur ONLY for non-opening images (keep opening clean for thumbnail)
-            if not is_opening_image:
-                # Create blurred version of current frame as background
-                blurred_frame = frame.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+            # ALWAYS apply blur to character background when showing floating image
+            # This makes the illustration stand out clearly
+            blurred_frame = frame.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 
-                # Create composite: blurred background + floating image
-                # First blend original frame with blurred version based on opacity
-                frame = Image.blend(frame, blurred_frame, floating_opacity * 0.7)
+            # Create composite: blurred background + floating image
+            # For opening image, use stronger blur effect to make illustration pop
+            blur_blend = floating_opacity * 0.85 if is_opening_image else floating_opacity * 0.7
+            frame = Image.blend(frame, blurred_frame, blur_blend)
 
             # Paste floating image with alpha
             if resized_floating.mode == 'RGBA':
@@ -1928,21 +1929,23 @@ class ShortVideoRenderer:
 
             if music_path.exists():
                 log(f"Mixing background music: {music_path} at volume {music_volume}")
-                # FFmpeg filter to mix narration and background music
-                # - Loop music to match narration duration
-                # - Apply volume levels
-                # - Normalize music for consistent volume
+                # SIMPLIFIED approach: use -stream_loop and -t to avoid infinite loop issues
+                # -stream_loop -1: loop the music input
+                # -t {duration}: limit output to narration duration
+                # This avoids the complex aloop filter that was causing timeouts
                 filter_complex = (
                     f"[1:a]volume={narration_volume}[narration];"
-                    f"[2:a]aloop=loop=-1:size=2e+09,volume={music_volume},dynaudnorm=f=150:g=15[music];"
-                    f"[narration][music]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                    f"[2:a]volume={music_volume}[music];"
+                    f"[narration][music]amix=inputs=2:duration=first[aout]"
                 )
 
                 ffmpeg_cmd = [
                     "ffmpeg", "-y",
                     "-i", temp_output,
                     "-i", audio_path,
+                    "-stream_loop", "-1",  # Loop music infinitely
                     "-i", str(music_path),
+                    "-t", str(audio_duration + 1),  # Limit to audio duration + 1 sec buffer
                     "-filter_complex", filter_complex,
                     "-map", "0:v",
                     "-map", "[aout]",
