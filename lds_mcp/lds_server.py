@@ -19,6 +19,7 @@ Run with: python server.py
 import json
 import os
 import sys
+import importlib
 from pathlib import Path
 from datetime import datetime
 
@@ -53,6 +54,25 @@ from lds_mcp.tools.project_state import (
     get_welcome_message,
     ProjectPhase
 )
+
+
+def reload_render_modules():
+    """
+    Force reload of render-related modules to pick up code changes.
+    This avoids needing to restart Claude Desktop after code changes.
+    """
+    modules_to_reload = [
+        'lds_mcp.tools.short_renderer',
+        'lds_mcp.tools.image_loader',
+    ]
+
+    for module_name in modules_to_reload:
+        if module_name in sys.modules:
+            try:
+                importlib.reload(sys.modules[module_name])
+                print(f"[MCP] Reloaded: {module_name}", file=sys.stderr)
+            except Exception as e:
+                print(f"[MCP] Failed to reload {module_name}: {e}", file=sys.stderr)
 
 # Initialize server
 server = Server("zero-sum-lds")
@@ -804,6 +824,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     elif name == "execute_render":
+        # IMPORTANT: Reload render modules to pick up any code changes
+        # This avoids needing to restart Claude Desktop after modifying short_renderer.py
+        reload_render_modules()
+
         print(f"[MCP_SERVER] execute_render called", file=sys.stderr, flush=True)
         print(f"[MCP_SERVER] arguments: {arguments}", file=sys.stderr, flush=True)
 
