@@ -1,0 +1,69 @@
+{
+  "images": [
+    {
+      "visual_asset_id": "opening",
+      "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/primer.jpeg",
+      "description": "Opening visual - person in contemplation/prayer on rock foundation"
+    },
+    {
+      "visual_asset_id": "1a",
+      "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/segundo.jpeg",
+      "description": "Elder David A. Bednar speaking at General Conference podium"
+    },
+    {
+      "visual_asset_id": "2a",
+      "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/tercer.png",
+      "description": "Scripture quote from D&C 101:16 - Let your hearts be comforted"
+    },
+    {
+      "visual_asset_id": "3a",
+      "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/cuarto.jpeg",
+      "description": "A person kneeling in peaceful prayer"
+    },
+    {
+      "visual_asset_id": "4a",
+      "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/quinta.jpeg",
+      "description": "A foundation being built on a solid rock with Jesus Christ symbolized"
+    },
+    {
+      "visual_asset_id": "5a",
+      "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/sexta.jpeg",
+      "description": "Silhouette of a person with hands raised toward heaven"
+    }
+  ],
+  "scripts": {
+    "lds_20260123_003618_c935c0": [
+      {
+        "visual_asset_id": "opening",
+        "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/primer.jpeg",
+        "dialogue_index": -1,
+        "is_opening": true
+      },
+      {
+        "visual_asset_id": "1a",
+        "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/segundo.jpeg",
+        "dialogue_index": 1
+      },
+      {
+        "visual_asset_id": "2a",
+        "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/tercer.png",
+        "dialogue_index": 3
+      },
+      {
+        "visual_asset_id": "3a",
+        "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/cuarto.jpeg",
+        "dialogue_index": 5
+      },
+      {
+        "visual_asset_id": "4a",
+        "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/quinta.jpeg",
+        "dialogue_index": 6
+      },
+      {
+        "visual_asset_id": "5a",
+        "path": "C:/Users/juanf/.claude-worktrees/zero-sum-yt/optimistic-sanderson/data/shorts/images/sexta.jpeg",
+        "dialogue_index": 8
+      }
+    ]
+  }
+}

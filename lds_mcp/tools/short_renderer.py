@@ -862,6 +862,9 @@ class ShortVideoRenderer:
         """
         Calculate when floating images should appear during the video.
 
+        If visual_assets already have start_time/end_time (from _extract_visual_assets_from_dialogue),
+        use those times directly. Otherwise, distribute evenly.
+
         Returns a list of dicts with:
         - image_path: path to the image
         - start_time: when to start showing
@@ -875,52 +878,71 @@ class ShortVideoRenderer:
             return []
 
         schedule = []
-        skip_start = floating_config.get("skip_first_seconds", 5)
-        skip_end = floating_config.get("skip_last_seconds", 5)
-        min_interval = floating_config.get("min_interval_seconds", 15)
-        max_interval = floating_config.get("max_interval_seconds", 20)
-        display_duration = floating_config.get("display_duration", 5)
         fade_in = floating_config.get("fade_in", 0.5)
         fade_out = floating_config.get("fade_out", 0.5)
 
-        # Calculate available time window
-        available_start = skip_start
-        available_end = audio_duration - skip_end
+        for asset in visual_assets:
+            # Check if asset already has timing from _extract_visual_assets_from_dialogue
+            if "start_time" in asset and "end_time" in asset:
+                start_time = asset["start_time"]
+                end_time = asset["end_time"]
 
-        if available_end <= available_start:
-            log("Not enough time for floating images", "WARN")
-            return []
+                # Calculate fade times
+                fade_in_end = start_time + fade_in
+                fade_out_start = end_time - fade_out
 
-        # Spread images evenly within the available window
-        avg_interval = (min_interval + max_interval) / 2
-        num_possible_slots = int((available_end - available_start - display_duration) / avg_interval) + 1
-        num_images = min(len(visual_assets), num_possible_slots)
+                # Ensure fade times don't overlap
+                if fade_in_end > fade_out_start:
+                    mid = (start_time + end_time) / 2
+                    fade_in_end = mid
+                    fade_out_start = mid
 
-        if num_images == 0:
-            return []
+                schedule.append({
+                    "image_path": asset.get("path", asset.get("image_path", "")),
+                    "description": asset.get("description", ""),
+                    "visual_asset_id": asset.get("visual_asset_id", ""),
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "fade_in_end": fade_in_end,
+                    "fade_out_start": fade_out_start
+                })
 
-        # Calculate spacing
-        total_content_time = available_end - available_start
-        spacing = total_content_time / (num_images + 1) if num_images > 0 else 0
+                log(f"Scheduled floating image '{asset.get('visual_asset_id', '')}': {start_time:.1f}s - {end_time:.1f}s")
 
-        for i, asset in enumerate(visual_assets[:num_images]):
-            start_time = available_start + spacing * (i + 1) - display_duration / 2
-            start_time = max(available_start, min(start_time, available_end - display_duration))
+            else:
+                # Fallback: use legacy uniform distribution
+                # This path is kept for backward compatibility
+                log(f"Asset missing timing, using legacy distribution", "WARN")
 
-            end_time = start_time + display_duration
-            fade_in_end = start_time + fade_in
-            fade_out_start = end_time - fade_out
+        # If no pre-timed assets, fall back to uniform distribution
+        if not schedule and visual_assets:
+            log("No pre-timed assets found, using uniform distribution")
+            skip_start = floating_config.get("skip_first_seconds", 5)
+            skip_end = floating_config.get("skip_last_seconds", 5)
+            display_duration = floating_config.get("display_duration", 5)
 
-            schedule.append({
-                "image_path": asset.get("path", asset.get("image_path", "")),
-                "description": asset.get("description", ""),
-                "start_time": start_time,
-                "end_time": end_time,
-                "fade_in_end": fade_in_end,
-                "fade_out_start": fade_out_start
-            })
+            available_start = skip_start
+            available_end = audio_duration - skip_end
 
-            log(f"Scheduled floating image: {start_time:.1f}s - {end_time:.1f}s ({asset.get('description', 'image')})")
+            if available_end > available_start:
+                num_images = len(visual_assets)
+                spacing = (available_end - available_start) / (num_images + 1)
+
+                for i, asset in enumerate(visual_assets):
+                    start_time = available_start + spacing * (i + 1) - display_duration / 2
+                    start_time = max(available_start, min(start_time, available_end - display_duration))
+                    end_time = start_time + display_duration
+                    fade_in_end = start_time + fade_in
+                    fade_out_start = end_time - fade_out
+
+                    schedule.append({
+                        "image_path": asset.get("path", asset.get("image_path", "")),
+                        "description": asset.get("description", ""),
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "fade_in_end": fade_in_end,
+                        "fade_out_start": fade_out_start
+                    })
 
         return schedule
 
@@ -977,6 +999,270 @@ class ShortVideoRenderer:
                     log(f"Error loading floating image {path}: {e}", "WARN")
 
         log(f"Floating image not found: {image_path}", "WARN")
+        return None
+
+    def _extract_visual_assets_from_dialogue(
+        self,
+        script_data: Dict[str, Any],
+        timestamps_data: Dict[str, Any],
+        base_dir: Path
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract visual_assets from dialogue items and map them to actual image files.
+
+        This function:
+        1. Handles opening_visual FIRST (appears before/during first dialogue)
+        2. Extracts visual_assets from each dialogue line
+        3. Maps visual_asset_id to registered images in data/shorts/images/
+        4. Calculates timing: images appear at MIDPOINT of the dialogue segment
+        5. Returns a list ready for the floating image scheduler
+
+        Args:
+            script_data: The script with dialogue containing visual_assets
+            timestamps_data: Word-level timestamps for timing
+            base_dir: Base directory of the project
+
+        Returns:
+            List of visual assets with paths and timing info
+        """
+        visual_assets = []
+
+        # Get script content
+        script = script_data.get("script", script_data)
+
+        # Get dialogue from script
+        dialogue = script.get("dialogue", [])
+
+        # Get timestamp segments for timing
+        segments = timestamps_data.get("segments", [])
+
+        # Load image registry to map visual_asset_id to actual files
+        image_registry = self._load_image_registry(base_dir)
+
+        log(f"Extracting visual assets from {len(dialogue)} dialogue lines")
+        log(f"Image registry has {len(image_registry)} mapped images")
+
+        # === HANDLE OPENING_VISUAL FIRST ===
+        # The opening_visual appears BEFORE or at the START of the first dialogue
+        # It shows the image first, then the character speaks in the background
+        opening_visual = script.get("opening_visual", {})
+        if opening_visual:
+            opening_duration = opening_visual.get("duration_seconds", 3.0)
+
+            # Find opening image - try registry first, then by name
+            opening_image_path = None
+
+            # Check if there's an "opening" entry in the registry
+            opening_image_path = image_registry.get("opening", "")
+            if not opening_image_path:
+                opening_image_path = image_registry.get("0a", "")
+            if not opening_image_path:
+                # Try to find by naming convention
+                opening_image_path = self._find_image_by_convention("opening", base_dir)
+            if not opening_image_path:
+                # Try primer.jpeg as opening image (first image in folder)
+                opening_image_path = self._find_image_by_convention("1a", base_dir)
+
+            if opening_image_path:
+                # Opening visual behavior:
+                # - Video starts with opening image visible
+                # - Character is ALREADY speaking in the background (audio plays from start)
+                # - At MIDPOINT of first dialogue text, the opening image fades out
+                # - Then we see the character speaking normally
+                #
+                # Timeline:
+                # 0s ----[Opening Image]---- midpoint ----[Character visible]---- end of first dialogue
+
+                end_time = opening_duration  # Default fallback
+
+                if segments:
+                    first_seg = segments[0]
+                    first_seg_start = first_seg.get("start", 0)
+                    first_seg_end = first_seg.get("end", opening_duration)
+                    first_seg_duration = first_seg_end - first_seg_start
+
+                    # Opening ends at midpoint of first dialogue segment
+                    # The character is speaking from start, but we only see them after midpoint
+                    end_time = first_seg_start + (first_seg_duration / 2)
+
+                    log(f"  Opening visual: first segment {first_seg_start:.1f}s - {first_seg_end:.1f}s, midpoint at {end_time:.1f}s")
+
+                visual_assets.append({
+                    "visual_asset_id": "opening",
+                    "path": opening_image_path,
+                    "image_path": opening_image_path,
+                    "description": opening_visual.get("image_prompt", "Opening visual"),
+                    "start_time": 0.0,
+                    "end_time": end_time,
+                    "is_opening": True,
+                    "dialogue_index": -1,  # Before any dialogue
+                    "segment_start": 0,
+                    "segment_end": end_time
+                })
+                log(f"  Opening visual -> {opening_image_path} (0.0s - {end_time:.1f}s)")
+            else:
+                log(f"  WARNING: No image found for opening_visual", "WARN")
+
+        for idx, line in enumerate(dialogue):
+            line_visual_assets = line.get("visual_assets", [])
+            if not line_visual_assets:
+                continue
+
+            # Get timing from corresponding timestamp segment
+            if idx < len(segments):
+                seg = segments[idx]
+                seg_start = seg.get("start", 0)
+                seg_end = seg.get("end", 0)
+                seg_duration = seg_end - seg_start
+
+                # Calculate midpoint - image appears at midpoint of dialogue
+                midpoint = seg_start + (seg_duration / 2)
+
+                # Each visual asset gets time from midpoint to end
+                remaining_duration = seg_end - midpoint
+                num_assets = len(line_visual_assets)
+                asset_duration = remaining_duration / num_assets if num_assets > 0 else 0
+
+                for v_idx, va in enumerate(line_visual_assets):
+                    visual_id = va.get("visual_asset_id", "")
+
+                    # Find actual image path from registry
+                    image_path = image_registry.get(visual_id, "")
+
+                    if not image_path:
+                        # Try to find by index-based naming convention
+                        # e.g., "1a" -> "primer.jpeg", "2a" -> "segundo.jpeg"
+                        image_path = self._find_image_by_convention(visual_id, base_dir)
+
+                    if image_path:
+                        start_time = midpoint + (v_idx * asset_duration)
+                        end_time = start_time + asset_duration
+
+                        # Ensure we don't exceed segment end
+                        if v_idx == num_assets - 1:
+                            end_time = seg_end
+
+                        visual_assets.append({
+                            "visual_asset_id": visual_id,
+                            "path": image_path,
+                            "image_path": image_path,  # Alias for compatibility
+                            "description": va.get("image_prompt", ""),
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "dialogue_index": idx,
+                            "segment_start": seg_start,
+                            "segment_end": seg_end
+                        })
+                        log(f"  Visual asset '{visual_id}' -> {image_path} ({start_time:.1f}s - {end_time:.1f}s)")
+                    else:
+                        log(f"  WARNING: No image found for visual_asset_id '{visual_id}'", "WARN")
+
+        log(f"Total visual assets extracted: {len(visual_assets)}")
+        return visual_assets
+
+    def _load_image_registry(self, base_dir: Path) -> Dict[str, str]:
+        """
+        Load the image registry that maps visual_asset_id to actual file paths.
+
+        The registry is stored at data/shorts/images/image_registry.json
+        """
+        registry_path = base_dir / "data" / "shorts" / "images" / "image_registry.json"
+
+        if not registry_path.exists():
+            log(f"Image registry not found at {registry_path}", "WARN")
+            return {}
+
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Build mapping from visual_asset_id to path
+            mapping = {}
+
+            # Handle structure: {"images": [...], "scripts": {...}}
+            images = data.get("images", [])
+            for img in images:
+                vid = img.get("visual_asset_id", "")
+                path = img.get("path", "")
+                if vid and path:
+                    mapping[vid] = path
+
+            # Also check for script-specific mappings
+            scripts = data.get("scripts", {})
+            for script_id, script_images in scripts.items():
+                if isinstance(script_images, list):
+                    for img in script_images:
+                        if isinstance(img, dict):
+                            vid = img.get("visual_asset_id", "")
+                            path = img.get("path", "")
+                            if vid and path:
+                                mapping[vid] = path
+
+            return mapping
+
+        except Exception as e:
+            log(f"Error loading image registry: {e}", "ERROR")
+            return {}
+
+    def _find_image_by_convention(self, visual_id: str, base_dir: Path) -> Optional[str]:
+        """
+        Find image by naming convention when not in registry.
+
+        Convention mapping:
+        - "1a" -> "primer.jpeg" or first image
+        - "2a" -> "segundo.jpeg" or second image
+        - etc.
+
+        Also tries direct file matching in data/shorts/images/
+        """
+        images_dir = base_dir / "data" / "shorts" / "images"
+
+        if not images_dir.exists():
+            return None
+
+        # Index-based convention
+        index_to_name = {
+            "1a": ["primer", "first", "1"],
+            "2a": ["segundo", "second", "2"],
+            "3a": ["tercer", "tercero", "third", "3"],
+            "4a": ["cuarto", "fourth", "4"],
+            "5a": ["quinta", "quinto", "fifth", "5"],
+            "6a": ["sexta", "sexto", "sixth", "6"],
+        }
+
+        # Get all image files
+        image_extensions = [".jpeg", ".jpg", ".png", ".webp"]
+        image_files = []
+        for ext in image_extensions:
+            image_files.extend(images_dir.glob(f"*{ext}"))
+
+        # Filter out registry file
+        image_files = [f for f in image_files if f.suffix.lower() in image_extensions]
+
+        # Try convention-based matching
+        if visual_id in index_to_name:
+            names_to_try = index_to_name[visual_id]
+            for img_file in image_files:
+                stem_lower = img_file.stem.lower()
+                for name in names_to_try:
+                    if name in stem_lower:
+                        return str(img_file)
+
+        # Try direct match on visual_id
+        for img_file in image_files:
+            if visual_id.lower() in img_file.stem.lower():
+                return str(img_file)
+
+        # Last resort: try by index position
+        # Extract number from visual_id (e.g., "1a" -> 1)
+        import re
+        match = re.match(r"(\d+)", visual_id)
+        if match:
+            index = int(match.group(1)) - 1  # 0-based
+            sorted_files = sorted(image_files, key=lambda f: f.name)
+            if 0 <= index < len(sorted_files):
+                return str(sorted_files[index])
+
         return None
 
     def _should_mouth_be_open(self, current_time: float, all_words: list) -> bool:
@@ -1454,11 +1740,11 @@ class ShortVideoRenderer:
             poses_used = set()
             current_character = "Analyst"
 
-            # Setup floating images
-            visual_assets = script_data.get("script", {}).get("visual_assets", [])
-            if not visual_assets:
-                visual_assets = script_data.get("visual_assets", [])
-            log(f"Visual assets found: {len(visual_assets)}")
+            # Setup floating images - extract from dialogue items AND map to registered images
+            visual_assets = self._extract_visual_assets_from_dialogue(
+                script_data, timestamps_data, self.base_dir
+            )
+            log(f"Visual assets extracted from dialogue: {len(visual_assets)}")
 
             floating_image_schedule = self._calculate_floating_image_schedule(audio_duration, visual_assets)
             log(f"Floating image schedule: {len(floating_image_schedule)} images")
