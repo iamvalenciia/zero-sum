@@ -1968,17 +1968,48 @@ class ShortVideoRenderer:
 
             log(f"FFmpeg command: {' '.join(ffmpeg_cmd)}")
 
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
+            # Use Popen for better control on Windows
+            # CREATE_NO_WINDOW prevents the FFmpeg console window from appearing
+            import sys
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = subprocess.CREATE_NO_WINDOW
 
-            if result.returncode != 0:
-                log(f"FFmpeg FAILED: {result.stderr}", "ERROR")
+            try:
+                process = subprocess.Popen(
+                    ffmpeg_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    creationflags=creation_flags
+                )
+
+                # Wait with timeout (600 seconds = 10 minutes)
+                stdout, stderr = process.communicate(timeout=600)
+                returncode = process.returncode
+                stderr_text = stderr.decode('utf-8', errors='replace') if stderr else ""
+
+            except subprocess.TimeoutExpired:
+                log("FFmpeg timeout - killing process", "ERROR")
+                process.kill()
+                process.wait()
+                # Fallback: keep video without audio
+                os.rename(temp_output, output_path)
+                return {
+                    "status": "partial",
+                    "message": "Video created but audio muxing timed out (10 min limit)",
+                    "output_path": output_path,
+                    "error": "FFmpeg timeout after 600 seconds"
+                }
+
+            if returncode != 0:
+                log(f"FFmpeg FAILED: {stderr_text}", "ERROR")
                 # Fallback: keep video without audio
                 os.rename(temp_output, output_path)
                 return {
                     "status": "partial",
                     "message": "Video created but audio muxing failed",
                     "output_path": output_path,
-                    "error": result.stderr
+                    "error": stderr_text
                 }
 
             # Clean up temp file
