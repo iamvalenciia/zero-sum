@@ -1,3 +1,0 @@
-verify all the information is true and the math are correct:
-
-json:

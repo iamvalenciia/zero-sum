@@ -461,6 +461,13 @@ zero-sum-yt/
 │   ├── lds_server.py           # Main MCP server
 │   └── tools/                  # All MCP tool implementations
 │
+├── src/
+│   ├── core/
+│   │   ├── elevenlabs.py       # ElevenLabs voice generation
+│   │   └── video_renderer.py   # FFmpeg/PyAV video rendering
+│   └── handlers/
+│       └── video_handler.py    # Video processing handlers
+│
 ├── data/
 │   ├── shorts/
 │   │   ├── scripts/            # Project scripts (JSON)
@@ -474,10 +481,20 @@ zero-sum-yt/
 │   │   ├── analyst/            # Analyst character images
 │   │   └── skeptic/            # Skeptic character images
 │   │
+│   ├── audio/
+│   │   ├── music/              # Background music files
+│   │   └── sound_effect/       # Sound effect files
+│   │
+│   ├── font/                   # Fonts for captions
+│   │
 │   └── production_plan.json    # Legacy script copy
 │
 ├── old-videos/                 # Archived projects
 │
+├── .env                        # Environment variables (API keys)
+├── .gitignore                  # Git ignore rules
+├── requirements.txt            # Python dependencies
+├── claude_desktop_config.json  # MCP server configuration
 └── README.md                   # This file
 ```
 
