@@ -319,6 +319,212 @@ def build_render_timeline(
     return segments
 
 
+def validate_render_prerequisites(
+    script_id: str,
+    shorts_dir: Path = None,
+    base_dir: Path = None
+) -> Dict[str, Any]:
+    """
+    Validate all render prerequisites BEFORE starting the render.
+
+    This function checks:
+    1. Character images exist (with correct extensions)
+    2. Visual assets/floating images can be found
+    3. Script structure is valid
+    4. Audio and timestamps exist
+
+    Returns a detailed validation report with errors and warnings.
+    Call this BEFORE render_short_video to avoid wasted render time.
+    """
+    import re
+
+    if shorts_dir is None:
+        shorts_dir = Path(__file__).parent.parent.parent / "data" / "shorts"
+    if base_dir is None:
+        base_dir = Path(__file__).parent.parent.parent
+
+    shorts_dir = Path(shorts_dir)
+    base_dir = Path(base_dir)
+
+    errors = []
+    warnings = []
+    info = []
+
+    # 1. Check script exists
+    script_path = shorts_dir / "scripts" / f"{script_id}.json"
+    if not script_path.exists():
+        errors.append(f"Script not found: {script_path}")
+        return {
+            "valid": False,
+            "errors": errors,
+            "warnings": warnings,
+            "info": info,
+            "summary": "Script file not found. Cannot proceed."
+        }
+
+    with open(script_path) as f:
+        script_data = json.load(f)
+    info.append(f"Script loaded: {script_id}")
+
+    # 2. Check audio file
+    audio_path = shorts_dir / "audio" / f"{script_id}.mp3"
+    if not audio_path.exists():
+        errors.append(f"Audio file not found: {audio_path}")
+    else:
+        info.append(f"Audio file found: {audio_path.name}")
+
+    # 3. Check timestamps file
+    timestamps_path = shorts_dir / "audio" / f"{script_id}_timestamps.json"
+    if not timestamps_path.exists():
+        warnings.append(f"Timestamps file not found: {timestamps_path.name} (will be auto-generated)")
+    else:
+        info.append(f"Timestamps file found: {timestamps_path.name}")
+
+    # 4. Check CHARACTER IMAGES (the main issue!)
+    images_dir = base_dir / "data" / "images"
+    extensions = [".png", ".jpeg", ".jpg", ".webp"]
+
+    # Get dialogue to determine which characters are used
+    dialogue = script_data.get("dialogue", [])
+    characters_used = set()
+    for line in dialogue:
+        char = line.get("character", "")
+        mapped_char = CHARACTER_MAPPING.get(char, char)
+        characters_used.add(mapped_char)
+
+    info.append(f"Characters in script: {list(characters_used)}")
+
+    for character in characters_used:
+        char_lower = character.lower()
+        char_dir = images_dir / char_lower
+
+        if not char_dir.exists():
+            errors.append(f"Character directory not found: {char_dir}")
+            continue
+
+        # Check for close_view (most commonly used)
+        pose_dirs = ["close_view", "front_view", "side_view", "pov_view"]
+        found_poses = []
+
+        for pose_dir in pose_dirs:
+            pose_path = char_dir / pose_dir
+            if pose_path.exists():
+                # Check for mouth images
+                mouth_open_found = False
+                mouth_closed_found = False
+
+                for ext in extensions:
+                    # Check various naming patterns
+                    patterns = [
+                        f"CloseMouth_Open{ext}",
+                        f"FrontMouth_Open{ext}",
+                        f"SideMouth_Open{ext}",
+                        f"PovMouth_Open{ext}",
+                    ]
+                    for pattern in patterns:
+                        if (pose_path / pattern).exists():
+                            mouth_open_found = True
+                            break
+
+                    patterns_closed = [
+                        f"CloseMouth_Closed{ext}",
+                        f"FrontMouth_Closed{ext}",
+                        f"SideMouth_Closed{ext}",
+                        f"PovMouth_Closed{ext}",
+                        f"FrontMouth_Close{ext}",  # Handle typo in skeptic
+                    ]
+                    for pattern in patterns_closed:
+                        if (pose_path / pattern).exists():
+                            mouth_closed_found = True
+                            break
+
+                if mouth_open_found and mouth_closed_found:
+                    found_poses.append(pose_dir)
+                elif mouth_open_found or mouth_closed_found:
+                    warnings.append(f"{character}/{pose_dir}: Missing {'open' if not mouth_open_found else 'closed'} mouth image")
+                    found_poses.append(f"{pose_dir} (partial)")
+
+        if found_poses:
+            info.append(f"{character}: Found poses - {', '.join(found_poses)}")
+        else:
+            errors.append(f"{character}: No valid pose images found! Check {char_dir}")
+
+    # 5. Check FLOATING IMAGES / Visual Assets
+    visual_assets_dir = shorts_dir / "images"
+    visual_assets_in_script = []
+
+    for line in dialogue:
+        line_assets = line.get("visual_assets") or []
+        for va in line_assets:
+            visual_id = va.get("visual_asset_id", "")
+            if visual_id:
+                visual_assets_in_script.append(visual_id)
+
+    if visual_assets_in_script:
+        info.append(f"Visual assets in script: {visual_assets_in_script}")
+
+        # Check image registry
+        registry_path = shorts_dir / "images" / "image_registry.json"
+        if registry_path.exists():
+            info.append("Image registry found")
+        else:
+            warnings.append("image_registry.json not found - will use naming convention")
+
+        # Check if images exist
+        available_images = []
+        for ext in [".jpeg", ".jpg", ".png", ".webp"]:
+            available_images.extend(visual_assets_dir.glob(f"*{ext}"))
+
+        image_names = [f.stem for f in available_images]
+        info.append(f"Available images in shorts/images: {[f.name for f in available_images]}")
+
+        # Try to match visual assets to images
+        for visual_id in visual_assets_in_script:
+            # Extract number from visual_id (e.g., "1a" -> 1)
+            match = re.match(r"(\d+)", visual_id)
+            target_num = match.group(1) if match else None
+
+            found = False
+            # Check exact match
+            if visual_id in image_names:
+                found = True
+            # Check numeric match (e.g., "1a" matches "1")
+            elif target_num and target_num in image_names:
+                found = True
+            # Check by index
+            elif target_num:
+                numeric_images = [f for f in available_images if re.match(r"^\d+$", f.stem)]
+                if len(numeric_images) >= int(target_num):
+                    found = True
+
+            if found:
+                info.append(f"  {visual_id}: Found matching image")
+            else:
+                warnings.append(f"  {visual_id}: No matching image found! Add image named '{target_num}.jpeg' or create image_registry.json")
+    else:
+        info.append("No visual assets defined in script (no floating images)")
+
+    # Generate summary
+    is_valid = len(errors) == 0
+    if is_valid and len(warnings) == 0:
+        summary = "All prerequisites validated successfully. Ready to render."
+    elif is_valid:
+        summary = f"Can render, but {len(warnings)} warning(s) found. Review warnings above."
+    else:
+        summary = f"Cannot render: {len(errors)} error(s) found. Fix errors before rendering."
+
+    return {
+        "valid": is_valid,
+        "errors": errors,
+        "warnings": warnings,
+        "info": info,
+        "summary": summary,
+        "script_id": script_id,
+        "characters_found": list(characters_used),
+        "visual_assets_found": len(visual_assets_in_script)
+    }
+
+
 async def render_short_video(
     script_id: str,
     hook_text: str,
@@ -358,6 +564,34 @@ async def render_short_video(
 
     with open(script_path) as f:
         script_data = json.load(f)
+
+    # === PRE-RENDER VALIDATION ===
+    # Run comprehensive validation BEFORE starting render to catch issues early
+    log("Running pre-render validation...")
+    validation = validate_render_prerequisites(script_id, shorts_dir, base_dir)
+
+    # Log validation results
+    for info_msg in validation.get("info", []):
+        log(f"  [INFO] {info_msg}")
+    for warn_msg in validation.get("warnings", []):
+        log(f"  [WARNING] {warn_msg}", "WARN")
+    for err_msg in validation.get("errors", []):
+        log(f"  [ERROR] {err_msg}", "ERROR")
+
+    log(f"Validation summary: {validation['summary']}")
+
+    # Return errors immediately to save time
+    if not validation["valid"]:
+        return {
+            "status": "validation_failed",
+            "message": validation["summary"],
+            "validation": validation,
+            "action_required": "Fix the errors listed above before rendering. Check character images and visual assets."
+        }
+
+    # Show warnings but continue
+    if validation.get("warnings"):
+        log(f"Continuing with {len(validation['warnings'])} warning(s)...", "WARN")
 
     # Check for audio
     audio_path = shorts_dir / "audio" / f"{script_id}.mp3"
@@ -612,6 +846,40 @@ async def execute_render(
     try:
         # Validate prerequisites
         log("Step 1: Validating prerequisites...")
+
+        # === COMPREHENSIVE PRE-RENDER VALIDATION ===
+        # This catches issues with character images and visual assets BEFORE wasting render time
+        log("Running comprehensive pre-render validation...")
+        validation = validate_render_prerequisites(script_id, shorts_dir, base_dir)
+
+        # Log validation results clearly
+        log("-" * 40)
+        for info_msg in validation.get("info", []):
+            log(f"  [INFO] {info_msg}")
+        for warn_msg in validation.get("warnings", []):
+            log(f"  [WARN] {warn_msg}", "WARN")
+        for err_msg in validation.get("errors", []):
+            log(f"  [ERROR] {err_msg}", "ERROR")
+        log(f"Validation result: {validation['summary']}")
+        log("-" * 40)
+
+        # STOP EARLY if validation fails
+        if not validation["valid"]:
+            update_render_status("error", f"Validation failed: {validation['summary']}", 0)
+            return {
+                "status": "validation_failed",
+                "message": validation["summary"],
+                "validation": validation,
+                "action_required": "\n".join([
+                    "Fix the following errors before rendering:",
+                    *[f"  - {e}" for e in validation.get("errors", [])]
+                ]),
+                "log_file": str(LOG_FILE)
+            }
+
+        # Show warnings but continue
+        if validation.get("warnings"):
+            log(f"Proceeding with {len(validation['warnings'])} warning(s)...", "WARN")
 
         script_path = shorts_dir / "scripts" / f"{script_id}.json"
         log(f"Checking script: {script_path}")
@@ -1183,6 +1451,7 @@ class ShortVideoRenderer:
         The registry is stored at data/shorts/images/image_registry.json
         """
         registry_path = base_dir / "data" / "shorts" / "images" / "image_registry.json"
+        images_dir = base_dir / "data" / "shorts" / "images"
 
         if not registry_path.exists():
             log(f"Image registry not found at {registry_path}", "WARN")
@@ -1192,8 +1461,21 @@ class ShortVideoRenderer:
             with open(registry_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Build mapping from visual_asset_id to path
+            # Build mapping from visual_asset_id to ABSOLUTE path
             mapping = {}
+
+            def resolve_path(relative_path: str) -> str:
+                """Convert relative path to absolute path."""
+                if not relative_path:
+                    return ""
+                # If already absolute, return as-is
+                if Path(relative_path).is_absolute():
+                    return relative_path
+                # Otherwise, resolve relative to images_dir
+                full_path = images_dir / relative_path
+                if full_path.exists():
+                    return str(full_path)
+                return ""  # Return empty if file doesn't exist
 
             # Handle structure: {"images": [...], "scripts": {...}}
             images = data.get("images", [])
@@ -1201,19 +1483,38 @@ class ShortVideoRenderer:
                 vid = img.get("visual_asset_id", "")
                 path = img.get("path", "")
                 if vid and path:
-                    mapping[vid] = path
+                    resolved = resolve_path(path)
+                    if resolved:
+                        mapping[vid] = resolved
+                        log(f"  Registry: {vid} -> {resolved}")
+                    else:
+                        log(f"  Registry: {vid} -> {path} (FILE NOT FOUND)", "WARN")
 
-            # Also check for script-specific mappings
+            # Also check for script-specific mappings (these override global)
             scripts = data.get("scripts", {})
-            for script_id, script_images in scripts.items():
-                if isinstance(script_images, list):
-                    for img in script_images:
+            for sid, script_mapping in scripts.items():
+                # Support both dict format and list format
+                if isinstance(script_mapping, dict):
+                    # Dict format: {"1a": "1.jpeg", "2a": "2.jpeg"}
+                    for vid, path in script_mapping.items():
+                        if vid.startswith("_"):  # Skip meta fields like "_note"
+                            continue
+                        if isinstance(path, str):
+                            resolved = resolve_path(path)
+                            if resolved:
+                                mapping[vid] = resolved
+                elif isinstance(script_mapping, list):
+                    # List format: [{"visual_asset_id": "1a", "path": "1.jpeg"}]
+                    for img in script_mapping:
                         if isinstance(img, dict):
                             vid = img.get("visual_asset_id", "")
                             path = img.get("path", "")
                             if vid and path:
-                                mapping[vid] = path
+                                resolved = resolve_path(path)
+                                if resolved:
+                                    mapping[vid] = resolved
 
+            log(f"Image registry loaded: {len(mapping)} mappings")
             return mapping
 
         except Exception as e:
@@ -1225,26 +1526,19 @@ class ShortVideoRenderer:
         Find image by naming convention when not in registry.
 
         Convention mapping:
-        - "1a" -> "primer.jpeg" or first image
-        - "2a" -> "segundo.jpeg" or second image
+        - "1a" -> looks for "1.jpeg", "primer.jpeg", etc.
+        - "2a" -> looks for "2.jpeg", "segundo.jpeg", etc.
         - etc.
 
         Also tries direct file matching in data/shorts/images/
         """
+        import re
+
         images_dir = base_dir / "data" / "shorts" / "images"
 
         if not images_dir.exists():
+            log(f"Images directory not found: {images_dir}", "WARN")
             return None
-
-        # Index-based convention
-        index_to_name = {
-            "1a": ["primer", "first", "1"],
-            "2a": ["segundo", "second", "2"],
-            "3a": ["tercer", "tercero", "third", "3"],
-            "4a": ["cuarto", "fourth", "4"],
-            "5a": ["quinta", "quinto", "fifth", "5"],
-            "6a": ["sexta", "sexto", "sixth", "6"],
-        }
 
         # Get all image files
         image_extensions = [".jpeg", ".jpg", ".png", ".webp"]
@@ -1255,30 +1549,77 @@ class ShortVideoRenderer:
         # Filter out registry file
         image_files = [f for f in image_files if f.suffix.lower() in image_extensions]
 
-        # Try convention-based matching
-        if visual_id in index_to_name:
-            names_to_try = index_to_name[visual_id]
+        log(f"Looking for image with visual_id '{visual_id}' in {images_dir}")
+        log(f"  Available images: {[f.name for f in image_files]}")
+
+        # Extract numeric index from visual_id (e.g., "1a" -> 1, "2a" -> 2, "opening" -> None)
+        match = re.match(r"(\d+)", visual_id)
+        target_index = int(match.group(1)) if match else None
+
+        # PRIORITY 1: Exact match on filename (without extension)
+        # e.g., visual_id="1a" matches "1a.jpeg", "1a.png"
+        for img_file in image_files:
+            if img_file.stem.lower() == visual_id.lower():
+                log(f"  Found exact match: {img_file}")
+                return str(img_file)
+
+        # PRIORITY 2: Numeric filename match (e.g., "1a" matches "1.jpeg")
+        if target_index is not None:
+            for img_file in image_files:
+                # Check if filename is exactly the number
+                if img_file.stem == str(target_index):
+                    log(f"  Found numeric match: {img_file}")
+                    return str(img_file)
+
+        # PRIORITY 3: Spanish/English name convention
+        index_to_names = {
+            1: ["primer", "primero", "first", "opening"],
+            2: ["segundo", "second"],
+            3: ["tercer", "tercero", "third"],
+            4: ["cuarto", "fourth"],
+            5: ["quinto", "quinta", "fifth"],
+            6: ["sexto", "sexta", "sixth"],
+            7: ["septimo", "seventh"],
+            8: ["octavo", "eighth"],
+            9: ["noveno", "ninth"],
+            10: ["decimo", "tenth"],
+        }
+
+        if target_index and target_index in index_to_names:
+            names_to_try = index_to_names[target_index]
             for img_file in image_files:
                 stem_lower = img_file.stem.lower()
                 for name in names_to_try:
-                    if name in stem_lower:
+                    if stem_lower == name or stem_lower.startswith(name):
+                        log(f"  Found convention match ({name}): {img_file}")
                         return str(img_file)
 
-        # Try direct match on visual_id
+        # PRIORITY 4: Sort numerically and get by index position
+        # This handles cases like having files: 1.jpeg, 2.jpeg, 3.jpeg
+        if target_index is not None:
+
+            def numeric_sort_key(f):
+                """Extract leading number from filename for numeric sort."""
+                m = re.match(r"(\d+)", f.stem)
+                return int(m.group(1)) if m else float('inf')
+
+            # Filter to only numeric-named files for position-based matching
+            numeric_files = [f for f in image_files if re.match(r"^\d+$", f.stem)]
+            if numeric_files:
+                sorted_files = sorted(numeric_files, key=numeric_sort_key)
+                # target_index is 1-based, convert to 0-based
+                idx = target_index - 1
+                if 0 <= idx < len(sorted_files):
+                    log(f"  Found by numeric position [{idx}]: {sorted_files[idx]}")
+                    return str(sorted_files[idx])
+
+        # PRIORITY 5: Fallback - any file containing the visual_id
         for img_file in image_files:
             if visual_id.lower() in img_file.stem.lower():
+                log(f"  Found partial match: {img_file}")
                 return str(img_file)
 
-        # Last resort: try by index position
-        # Extract number from visual_id (e.g., "1a" -> 1)
-        import re
-        match = re.match(r"(\d+)", visual_id)
-        if match:
-            index = int(match.group(1)) - 1  # 0-based
-            sorted_files = sorted(image_files, key=lambda f: f.name)
-            if 0 <= index < len(sorted_files):
-                return str(sorted_files[index])
-
+        log(f"  No image found for visual_id '{visual_id}'", "WARN")
         return None
 
     def _should_mouth_be_open(self, current_time: float, all_words: list) -> bool:
@@ -1414,20 +1755,31 @@ class ShortVideoRenderer:
         pose_dir = pose_to_dir.get(pose, f"{pose}_view")
         mouth_state = "Open" if mouth_open else "Closed"
 
+        # Supported image extensions (in order of preference)
+        extensions = [".png", ".jpeg", ".jpg", ".webp"]
+
         # Build possible paths based on actual directory structure
-        # Structure: data/images/{character}/{pose}_view/{Pose}Mouth_{State}.png
-        possible_paths = [
-            # New structure: analyst/close_view/CloseMouth_Open.png
-            self.images_dir / char_lower / pose_dir / f"CloseMouth_{mouth_state}.png",
-            self.images_dir / char_lower / pose_dir / f"FrontMouth_{mouth_state}.png",
-            self.images_dir / char_lower / pose_dir / f"SideMouth_{mouth_state}.png",
-            self.images_dir / char_lower / pose_dir / f"PovMouth_{mouth_state}.png",
+        # Structure: data/images/{character}/{pose}_view/{Pose}Mouth_{State}.{ext}
+        possible_paths = []
+
+        # Base patterns to try (without extension)
+        base_patterns = [
+            # New structure: analyst/close_view/CloseMouth_Open
+            self.images_dir / char_lower / pose_dir / f"CloseMouth_{mouth_state}",
+            self.images_dir / char_lower / pose_dir / f"FrontMouth_{mouth_state}",
+            self.images_dir / char_lower / pose_dir / f"SideMouth_{mouth_state}",
+            self.images_dir / char_lower / pose_dir / f"PovMouth_{mouth_state}",
             # Generic pattern
-            self.images_dir / char_lower / pose_dir / f"{pose.capitalize()}Mouth_{mouth_state}.png",
+            self.images_dir / char_lower / pose_dir / f"{pose.capitalize()}Mouth_{mouth_state}",
             # Fallback to old flat structure
-            self.images_dir / f"{char_lower}_{pose}.png",
-            self.images_dir / f"{char_lower}.png",
+            self.images_dir / f"{char_lower}_{pose}",
+            self.images_dir / f"{char_lower}",
         ]
+
+        # Add all extension variants for each pattern
+        for base in base_patterns:
+            for ext in extensions:
+                possible_paths.append(Path(str(base) + ext))
 
         log(f"Looking for image: {character} -> {char_lower}/{pose_dir} (mouth: {mouth_state})")
         for img_path in possible_paths:

@@ -45,7 +45,7 @@ from lds_mcp.tools.script_generator import create_lds_script
 from lds_mcp.tools.content_search import search_lds_content, search_world_news
 from lds_mcp.tools.quote_verifier import verify_lds_quote
 from lds_mcp.tools.image_manager import ImageManager
-from lds_mcp.tools.short_renderer import render_short_video, execute_render
+from lds_mcp.tools.short_renderer import render_short_video, execute_render, validate_render_prerequisites
 from lds_mcp.tools.project_manager import get_project_manager
 from lds_mcp.tools.file_manager import handle_file_operation, FileManager
 from lds_mcp.tools.workflow import handle_workflow_operation
@@ -276,6 +276,33 @@ async def list_tools() -> list[Tool]:
                     }
                 },
                 "required": []
+            }
+        ),
+        Tool(
+            name="validate_render",
+            description="""IMPORTANT: Call this BEFORE execute_render to catch issues early!
+
+            Validates all render prerequisites to avoid wasted render time:
+            - Character images exist (correct format/extension)
+            - Visual assets/floating images can be found
+            - Script structure is valid
+            - Audio and timestamps exist
+
+            Returns a detailed validation report with:
+            - errors: Issues that MUST be fixed before rendering
+            - warnings: Issues that may affect quality but won't stop render
+            - info: Helpful information about what was found
+
+            ALWAYS call this before execute_render to save time!""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script_id": {
+                        "type": "string",
+                        "description": "ID of the script to validate"
+                    }
+                },
+                "required": ["script_id"]
             }
         ),
         Tool(
@@ -802,6 +829,46 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent | ImageConte
                 "Timestamps will be auto-generated during render"
             ]
         }
+
+        return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+    elif name == "validate_render":
+        # Import the validation function
+        from lds_mcp.tools.short_renderer import validate_render_prerequisites
+
+        script_id = arguments.get("script_id")
+        if not script_id:
+            return [TextContent(type="text", text=json.dumps({
+                "status": "error",
+                "message": "script_id is required"
+            }, indent=2))]
+
+        # Run validation
+        validation = validate_render_prerequisites(
+            script_id=script_id,
+            shorts_dir=SHORTS_DIR,
+            base_dir=DATA_DIR.parent
+        )
+
+        # Format response with clear action items
+        response = {
+            "status": "valid" if validation["valid"] else "invalid",
+            "can_render": validation["valid"],
+            "summary": validation["summary"],
+            "script_id": script_id,
+            "details": {
+                "errors": validation.get("errors", []),
+                "warnings": validation.get("warnings", []),
+                "info": validation.get("info", [])
+            }
+        }
+
+        if not validation["valid"]:
+            response["action_required"] = "Fix the errors listed above before calling execute_render"
+        elif validation.get("warnings"):
+            response["note"] = f"Ready to render, but {len(validation['warnings'])} warning(s) found. Review warnings."
+        else:
+            response["note"] = "All checks passed! You can proceed with execute_render."
 
         return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
