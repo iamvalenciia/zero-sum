@@ -2270,7 +2270,40 @@ class ShortVideoRenderer:
             log("Adding audio track with FFmpeg...")
             update_render_status("muxing", "Adding audio track...", 92)
             temp_output = output_path.replace(".mp4", "_temp.mp4")
-            os.rename(output_path, temp_output)
+
+            # Wait for file to be released by PyAV (Windows/OneDrive file locking issue)
+            # Use shutil.copy instead of rename to avoid OneDrive locking issues
+            import time
+            import shutil
+            max_retries = 10  # More retries for OneDrive
+            renamed = False
+
+            for attempt in range(max_retries):
+                try:
+                    # First try rename (fastest)
+                    os.rename(output_path, temp_output)
+                    log(f"File renamed successfully on attempt {attempt + 1}")
+                    renamed = True
+                    break
+                except PermissionError as e:
+                    if attempt < max_retries - 1:
+                        log(f"File locked (OneDrive sync?), waiting... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(2)  # Wait 2 seconds for OneDrive to release
+                    else:
+                        # Last resort: copy instead of rename
+                        log(f"Cannot rename after {max_retries} attempts, trying copy...", "WARN")
+                        try:
+                            shutil.copy2(output_path, temp_output)
+                            log("File copied successfully (OneDrive workaround)")
+                            renamed = True
+                            # Don't delete original - OneDrive may still have it locked
+                        except Exception as copy_error:
+                            log(f"Copy also failed: {copy_error}", "ERROR")
+                            # Continue anyway - use original file directly
+                            temp_output = output_path
+                            output_path = output_path.replace(".mp4", "_final.mp4")
+                            log(f"Using fallback: output will be {output_path}")
+                            renamed = True  # Mark as "handled"
 
             import subprocess
 
