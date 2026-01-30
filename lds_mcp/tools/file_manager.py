@@ -10,7 +10,7 @@ import os
 import shutil
 import json
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 
 
@@ -23,6 +23,7 @@ class FileManager:
     - Register images from external paths (with copy)
     - List directory contents
     - Safe path validation (no escaping project root)
+    - PROTECTED: Character images cannot be deleted or moved
     """
 
     # Allowed file extensions for images
@@ -30,6 +31,25 @@ class FileManager:
 
     # Allowed directories for file operations
     ALLOWED_SUBDIRS = {'data', 'old-videos'}
+
+    # PROTECTED PATHS - These directories/files CANNOT be deleted or modified destructively
+    # This prevents accidental deletion of critical character assets
+    PROTECTED_PATHS = {
+        'data/images/analyst',      # Analyst character images
+        'data/images/skeptic',      # Skeptic character images
+        'data/images/final_screen', # Final screen image
+        'data/images/images_catalog.json',  # Image catalog
+        'data/audio/music',         # Background music
+        'data/font',                # Fonts
+    }
+
+    # File patterns that are NEVER allowed to be deleted
+    PROTECTED_PATTERNS = [
+        '**/analyst/**',
+        '**/skeptic/**',
+        '**/images_catalog.json',
+        '**/final_screen/**',
+    ]
 
     def __init__(self, base_dir: Optional[Path] = None):
         if base_dir is None:
@@ -144,6 +164,9 @@ class FileManager:
         """
         Move a file within the project.
 
+        PROTECTED FILES: Character images (analyst, skeptic), images_catalog.json,
+        and other critical assets CANNOT be moved.
+
         Note: For safety, source must be within project directory.
         Use copy_file for external sources.
 
@@ -166,6 +189,16 @@ class FileManager:
                     "status": "error",
                     "message": "Cannot move files from outside project. Use copy_file instead.",
                     "source": str(src_path)
+                }
+
+            # CHECK PROTECTED PATHS - Prevent moving critical assets
+            is_protected, reason = self._is_protected_path(src_path)
+            if is_protected:
+                return {
+                    "status": "error",
+                    "message": f"PROTECTED FILE: {reason}",
+                    "path": str(src_path),
+                    "protection_info": "Character images and critical assets are protected. Use copy_file if you need a copy elsewhere."
                 }
 
             dest_path = self._ensure_dest_dir(Path(destination))
@@ -417,9 +450,43 @@ class FileManager:
                 "path": path
             }
 
+    def _is_protected_path(self, path: Path) -> Tuple[bool, str]:
+        """
+        Check if a path is protected from deletion/modification.
+
+        Returns:
+            Tuple of (is_protected, reason)
+        """
+        try:
+            relative_path = path.relative_to(self.base_dir)
+            path_str = str(relative_path).replace("\\", "/")
+
+            # Check against protected paths
+            for protected in self.PROTECTED_PATHS:
+                if path_str.startswith(protected) or protected in path_str:
+                    return True, f"Path is protected: {protected} (character assets cannot be deleted)"
+
+            # Check against protected patterns
+            for pattern in self.PROTECTED_PATTERNS:
+                # Simple pattern matching
+                if "analyst" in path_str.lower() or "skeptic" in path_str.lower():
+                    return True, "Character images (analyst/skeptic) are protected and cannot be deleted"
+                if "images_catalog" in path_str.lower():
+                    return True, "images_catalog.json is protected and cannot be deleted"
+                if "final_screen" in path_str.lower():
+                    return True, "final_screen images are protected and cannot be deleted"
+
+            return False, ""
+        except ValueError:
+            # Path is outside project
+            return False, ""
+
     def delete_file(self, path: str, confirm: bool = False) -> Dict[str, Any]:
         """
         Delete a file within the project.
+
+        PROTECTED FILES: Character images (analyst, skeptic), images_catalog.json,
+        and other critical assets CANNOT be deleted.
 
         Args:
             path: File path to delete
@@ -445,6 +512,16 @@ class FileManager:
                 return {
                     "status": "error",
                     "message": "Can only delete files within project"
+                }
+
+            # CHECK PROTECTED PATHS - This prevents accidental deletion of character images
+            is_protected, reason = self._is_protected_path(file_path)
+            if is_protected:
+                return {
+                    "status": "error",
+                    "message": f"PROTECTED FILE: {reason}",
+                    "path": str(file_path),
+                    "protection_info": "Character images and critical assets are protected to prevent accidental deletion. These files are essential for video rendering."
                 }
 
             if file_path.is_dir():
