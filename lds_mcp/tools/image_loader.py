@@ -108,6 +108,9 @@ class ImageLoader:
 
     CATALOG_FILENAME = "images_catalog.json"
 
+    # Supported image extensions - will try alternatives if primary doesn't exist
+    SUPPORTED_EXTENSIONS = [".jpeg", ".jpg", ".png", ".webp"]
+
     def __init__(self, base_dir: Path, preload: bool = False):
         """
         Initialize the image loader.
@@ -149,6 +152,10 @@ class ImageLoader:
             closed_path = self.base_dir / entry["closed"]["path"]
             open_path = self.base_dir / entry["open"]["path"]
 
+            # Try alternative extensions if file doesn't exist
+            closed_path = self._find_with_alt_extension(closed_path)
+            open_path = self._find_with_alt_extension(open_path)
+
             self._poses[pose_id] = PoseImage(
                 pose_id=pose_id,
                 character=character,
@@ -158,6 +165,27 @@ class ImageLoader:
             )
 
         self._loaded = True
+
+    def _find_with_alt_extension(self, path: Path) -> Path:
+        """
+        Find a file with alternative extension if the original doesn't exist.
+
+        This handles cases where catalog says .png but file is .jpeg, etc.
+        """
+        if path.exists():
+            return path
+
+        # Try each supported extension
+        stem = path.stem
+        parent = path.parent
+
+        for ext in self.SUPPORTED_EXTENSIONS:
+            alt_path = parent / f"{stem}{ext}"
+            if alt_path.exists():
+                return alt_path
+
+        # Return original path (will fail gracefully later)
+        return path
 
     def get_image(
         self,
