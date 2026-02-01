@@ -3,6 +3,13 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
+# Mapping of legacy pose ID prefixes to standard ones
+# Standard: skeptic_*, analyst_* (matches images_catalog.json)
+POSE_ID_ALIASES = {
+    "brother_marcus": "skeptic",
+    "sister_faith": "analyst",
+}
+
 class VideoAnimationBuilder:
     def __init__(self):
         self.pose_registry = {}
@@ -30,6 +37,36 @@ class VideoAnimationBuilder:
                 "closed": entry.get('closed', {}).get('path'),
                 "open": entry.get('open', {}).get('path')
             }
+
+    def _normalize_pose_id(self, pose_id: str) -> str:
+        """
+        Normalize legacy pose IDs to standard catalog IDs.
+        E.g., 'brother_marcus_side' -> 'skeptic_side'
+        """
+        if not pose_id:
+            return pose_id
+        for old_prefix, new_prefix in POSE_ID_ALIASES.items():
+            if pose_id.startswith(old_prefix):
+                return pose_id.replace(old_prefix, new_prefix, 1)
+        return pose_id
+
+    def _find_contextual_image_path(self, visual_id: str) -> str:
+        """
+        Find the actual path of a contextual image with any supported extension.
+        Searches for .png, .jpeg, .jpg in generated_images folder.
+        """
+        base_path = Path("data/images/generated_images")
+        extensions = [".png", ".jpeg", ".jpg", ".webp"]
+        
+        for ext in extensions:
+            candidate = base_path / f"{visual_id}{ext}"
+            if candidate.exists():
+                return str(candidate).replace("\\", "/")
+        
+        # Fallback - return .png path even if not exists (will log error later)
+        self.missing_log.add(f"MISSING_CONTEXTUAL_IMAGE: {visual_id}")
+        return f"data/images/generated_images/{visual_id}.png"
+
 
     def _count_syllables(self, word: str) -> int:
         """
@@ -149,6 +186,17 @@ class VideoAnimationBuilder:
         
         previous_character = None
         
+        # GLOBAL TRACKING: Find and track the opening visual asset ID BEFORE processing segments
+        # This ensures we filter this image from ALL segments, not just the first one
+        used_opening_id = None
+        for seg in raw_segments:
+            vas = seg.get('visual_assets', [])
+            if vas and isinstance(vas, list) and vas:
+                first_va = vas[0]
+                if first_va.get('visual_asset_id'):
+                    used_opening_id = first_va.get('visual_asset_id')
+                    break
+        
         for idx, segment in enumerate(raw_segments):
             text = segment.get('text', '')
             character = segment.get('character', 'Unknown')
@@ -158,33 +206,48 @@ class VideoAnimationBuilder:
             visual_assets = segment.get('visual_assets', [])
             
             contextual_images = []
+            
+            # OPENING VISUAL: For first segment, inject a pre-segment opening image
+            # This makes each video start with an illustration instead of always the same character
+            if idx == 0 and used_opening_id:
+                opening_duration = 2.5  # Show opening image for 2.5 seconds
+                contextual_images.append({
+                    "id": f"opening_{used_opening_id}",
+                    "path": self._find_contextual_image_path(used_opening_id),
+                    "start_time": 0,
+                    "end_time": opening_duration,
+                    "is_fullscreen": True
+                })
+            
             if visual_assets and isinstance(visual_assets, list) and visual_assets:
-                seg_start = words[0]['start'] if words else segment.get('start', 0)
-                seg_end = words[-1]['end'] if words else segment.get('end', 0)
-                seg_duration = seg_end - seg_start
-                midpoint = seg_start + (seg_duration / 2)
+                filtered_assets = [va for va in visual_assets if va.get('visual_asset_id') != used_opening_id]
                 
-                # Second half duration
-                ctx_duration_available = seg_end - midpoint
-                num_assets = len(visual_assets)
-                asset_duration = ctx_duration_available / num_assets if num_assets > 0 else 0
-
-                for v_idx, va in enumerate(visual_assets):
+                for va in filtered_assets:
                     visual_id = va.get('visual_asset_id')
-                    if visual_id:
-                        start_t = round(midpoint + (v_idx * asset_duration), 3)
-                        end_t = round(start_t + asset_duration, 3)
-                        # Ensure we don't exceed seg_end due to rounding
-                        if v_idx == num_assets - 1:
-                            end_t = round(seg_end, 3)
-
-                        contextual_images.append({
-                            "id": visual_id,
-                            "path": f"data/images/generated_images/{visual_id}.png",
-                            "start_time": start_t,
-                            "end_time": end_t,
-                            "is_fullscreen": va.get('is_fullscreen', True)
-                        })
+                    if not visual_id:
+                        continue
+                    
+                    # Use word indices for precise timing
+                    start_idx = va.get('start_word_index')
+                    end_idx = va.get('end_word_index')
+                    
+                    if start_idx is not None and words:
+                        start_idx = max(0, min(start_idx, len(words) - 1))
+                        end_idx = max(start_idx, min(end_idx or start_idx, len(words) - 1))
+                        start_t = words[start_idx]['start']
+                        end_t = words[end_idx]['end']
+                    else:
+                        seg_start = words[0]['start'] if words else segment.get('start', 0)
+                        seg_end = words[-1]['end'] if words else segment.get('end', 0)
+                        start_t, end_t = seg_start, seg_end
+            
+                    contextual_images.append({
+                        "id": visual_id,
+                        "path": self._find_contextual_image_path(visual_id),
+                        "start_time": round(start_t, 3),
+                        "end_time": round(end_t, 3),
+                        "is_fullscreen": va.get('is_fullscreen', True)
+                    })
 
             transition_sound = None
             if previous_character and character != previous_character:
@@ -203,11 +266,11 @@ class VideoAnimationBuilder:
                 current_pose_id = None
                 for pose in char_poses:
                     if pose['start_word_index'] <= w_idx <= pose['end_word_index']:
-                        current_pose_id = pose['pose_id']
+                        current_pose_id = self._normalize_pose_id(pose['pose_id'])
                         break
                 
                 if not current_pose_id and char_poses:
-                    current_pose_id = char_poses[0]['pose_id']
+                    current_pose_id = self._normalize_pose_id(char_poses[0]['pose_id'])
                 
                 animation_frames = self._create_animation_frames(w_text, w_start, w_end, current_pose_id)
                 

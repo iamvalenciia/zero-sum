@@ -1,0 +1,31 @@
+if visual_assets and isinstance(visual_assets, list) and visual_assets:
+                seg_start = words[0]['start'] if words else segment.get('start', 0)
+                seg_end = words[-1]['end'] if words else segment.get('end', 0)
+                seg_duration = seg_end - seg_start
+                midpoint = seg_start + (seg_duration / 2)
+                
+                # Second half duration
+                ctx_duration_available = seg_end - midpoint
+                # Filter out the opening image if it was already used
+                filtered_assets = [va for va in visual_assets if va.get('visual_asset_id') != used_opening_id]
+                num_assets = len(filtered_assets)
+                asset_duration = ctx_duration_available / num_assets if num_assets > 0 else 0
+
+                for v_idx, va in enumerate(filtered_assets):
+                    visual_id = va.get('visual_asset_id')
+                    if visual_id:
+                        start_t = round(midpoint + (v_idx * asset_duration), 3)
+                        end_t = round(start_t + asset_duration, 3)
+                        # Ensure we don't exceed seg_end due to rounding
+                        if v_idx == num_assets - 1:
+                            end_t = round(seg_end, 3)
+
+                        contextual_images.append({
+                            "id": visual_id,
+                            "path": self._find_contextual_image_path(visual_id),
+                            "start_time": start_t,
+                            "end_time": end_t,
+                            "is_fullscreen": va.get('is_fullscreen', True)
+                        })
+
+            

@@ -27,6 +27,9 @@ class BaseHandler(ABC):
             "create-video-script": self._create_video_script, # NEW NAME
             "video-render": self._create_final_video,
             "archive-project": self._archive_project,
+            # SHORTS COMMANDS
+            "create-video-script-shorts": self._create_video_script_shorts,
+            "video-render-shorts": self._create_final_video_shorts,
         }
         
     def execute(self, command: Optional[str]):
@@ -41,6 +44,8 @@ class BaseHandler(ABC):
                 traceback.print_exc()
         else:
             print(f"[ERROR] Unknown command: {command}")
+
+    # ... [Existing methods omitted for brevity, keeping them as they were] ...
 
     def _generate_images(self):
         print("Generating images...")
@@ -114,8 +119,15 @@ class BaseHandler(ABC):
         if production_plan_path.exists():
             with open(production_plan_path, 'r', encoding='utf-8') as f:
                 plan = json.load(f)
-                script = plan.get('script', {})
-                dialogue = script.get('dialogue', [])
+                # Support both formats:
+                # 1. Nested: { "script": { "dialogue": [...] } }
+                # 2. Root level: { "dialogue": [...] }
+                if 'script' in plan and 'dialogue' in plan['script']:
+                    dialogue = plan['script']['dialogue']
+                elif 'dialogue' in plan:
+                    dialogue = plan['dialogue']
+                else:
+                    dialogue = []
                 script_content = dialogue
                 print(f"Loaded {len(script_content)} script segments for alignment.")
 
@@ -230,24 +242,86 @@ class BaseHandler(ABC):
             import traceback
             traceback.print_exc()
 
+    def _create_video_script_shorts(self):
+        """
+        ASSEMBLE ASSETS FOR SHORTS:
+        Uses shorts images catalog and outputs to a dedicated shorts script file.
+        """
+        print("Assembling assets for SHORTS (Enriching segments)...")
+        
+        builder = VideoAnimationBuilder()
+        
+        # Path files
+        timestamps_path = self.base_dir / "data" / "audio" / "elevenlabs" / "dialogue_timestamps.json"
+        
+        # SHORTS catalog
+        images_path = self.base_dir / "data" / "shorts" / "images_catalog.json"
+        
+        # SHORTS output script
+        output_segments_path = self.base_dir / "data" / "shorts" / "video-script.json"
+        
+        # Ensure directory exists
+        output_segments_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            output_path = builder.build_video_plan(
+                str(timestamps_path),
+                str(images_path), 
+                str(output_segments_path)
+            )
+            print(f"✅ [SHORTS] Assets assembled and saved to: {output_path}")
+                
+        except Exception as e:
+            print(f"❌ Error assembling assets for shorts: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _create_final_video(self):
         """Create the final assembled video using the new video-script.json structure"""
         print("Creating final video...")
+        self._render_video_generic(
+            script_path="data/video-script.json",
+            output_path="data/output/final_video.mp4",
+            mode="long"
+        )
 
+    def _create_final_video_shorts(self):
+        """Create the final assembled SHORT video"""
+        print("Creating final SHORTS video...")
+        
+        # Request Title from user or load from plan
+        # For automation, we can check if it's in production plan or ask
+        # Here we'll try to read from production plan first
+        title_text = "Finding Peace" # Default
+        try:
+             with open(self.base_dir / "data" / "production_plan.json", 'r', encoding='utf-8') as f:
+                plan = json.load(f)
+                title_text = plan.get("opening_visual", {}).get("text_overlay", "Shorts Video")
+        except:
+            pass
+            
+        print(f"ℹ️ Using Title for Shorts: '{title_text}'")
+        
+        self._render_video_generic(
+            script_path="data/shorts/video-script.json",
+            output_path="data/shorts/output/final_video_shorts.mp4",
+            mode="shorts",
+            title_text=title_text
+        )
+
+    def _render_video_generic(self, script_path, output_path, mode="long", title_text=""):
         # =============================
         # 1. Define File Paths (Centralized)
         # =============================
-        # The new source of truth
-        synced_plan_path = self.base_dir / "data" / "video-script.json"
+        synced_plan_path = self.base_dir / script_path
         
         # New music path (Piano with nature sounds)
         background_music_path = str(
             self.base_dir / "data" / "audio" / "music" / "Frolic-Es-Jammy-Jams.mp3"
         )
         
-        # New consistent output directory
-        output_path = str(
-            self.base_dir / "data" / "output" / "final_video.mp4"
+        final_output_path = str(
+            self.base_dir / output_path
         )
         
         # =============================
@@ -263,35 +337,31 @@ class BaseHandler(ABC):
         except Exception as e:
             print(f"[ERROR] Failed to load video script: {e}")
             return
-
+            
         # =============================
         # 3. Dynamic Paths from Script
         # =============================
-        # Get narration audio path from the script itself
         narration_audio_path = synced_plan_data.get("audio_file")
         
         if not narration_audio_path or not Path(narration_audio_path).exists():
-            # Fallback check if it's a relative path in the JSON
-            if narration_audio_path:
+             if narration_audio_path:
                 potential_path = self.base_dir / narration_audio_path
                 if potential_path.exists():
                     narration_audio_path = str(potential_path)
                 else:
                     print(f"[ERROR] Narration audio file not found: {narration_audio_path}")
                     return
-            else:
+             else:
                 print("[ERROR] 'audio_file' key missing in video-script.json")
                 return
 
         # =============================
         # 4. Configure Video Settings
         # =============================
-        config = VideoConfig()
-        # Ensure harmonic audio for students (Soft background)
-        # config.music_volume and config.narration_volume are now controlled in src/core/video_renderer.py
-
-        # Create output directory if it doesn't exist
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        config = VideoConfig(mode=mode, title_text=title_text)
+        
+        # Create output directory
+        Path(final_output_path).parent.mkdir(parents=True, exist_ok=True)
         
         # =============================
         # 5. Assemble Video
@@ -301,11 +371,11 @@ class BaseHandler(ABC):
                 synced_plan_data=synced_plan_data,
                 narration_audio_path=narration_audio_path,
                 background_music_path=background_music_path,
-                output_path=output_path,
+                output_path=final_output_path,
                 config=config
             )
             
-            print(f"✅ Final video created successfully: {final_video_path}")
+            print(f"✅ Final video ({mode}) created successfully: {final_video_path}")
             
         except Exception as e:
             print(f"[ERROR] Failed to create video: {e}")
@@ -334,7 +404,8 @@ class BaseHandler(ABC):
         # 2. Handle JSON Files (Copy to archive, then Clear original)
         json_files = [
             "data/video-script.json",
-            "data/production_plan.json"
+            "data/production_plan.json",
+            "data/shorts/video-script.json" # Added shorts script
         ]
         
         for relative_path in json_files:
@@ -345,14 +416,16 @@ class BaseHandler(ABC):
                     shutil.copy2(file_path, archive_dir / file_path.name)
                     print(f"Archived: {file_path.name}")
                     
-                    # Clear original
+                    # Clear original (only if it's not a config file we want to keep structure of)
+                    # For script files, clearing is fine.
                     with open(file_path, 'w', encoding='utf-8') as f:
                         json.dump({}, f, indent=2)
                     print(f"Cleared: {file_path.name}")
                 except Exception as e:
                     print(f"[ERROR] Failed to process {file_path.name}: {e}")
             else:
-                print(f"[WARNING] File not found: {file_path}")
+                pass 
+                # print(f"[WARNING] File not found: {file_path}")
 
         # 3. Handle Audio Files (Move to archive)
         audio_files = [
@@ -369,18 +442,23 @@ class BaseHandler(ABC):
                 except Exception as e:
                     print(f"[ERROR] Failed to move {file_path.name}: {e}")
             else:
-                print(f"[WARNING] File not found: {file_path}")
+                pass
+                # print(f"[WARNING] File not found: {file_path}")
 
         # 4. Handle Final Video (Move to archive)
-        final_video_path = self.base_dir / "data/output/final_video.mp4"
-        if final_video_path.exists():
-            try:
-                shutil.move(str(final_video_path), str(archive_dir / final_video_path.name))
-                print(f"Moved: {final_video_path.name}")
-            except Exception as e:
-                print(f"[ERROR] Failed to move final video: {e}")
-        else:
-             print(f"[WARNING] Final video not found: {final_video_path}")
+        video_files = [
+            "data/output/final_video.mp4",
+            "data/shorts/output/final_video_shorts.mp4"
+        ]
+        
+        for v_path in video_files:
+             final_video_path = self.base_dir / v_path
+             if final_video_path.exists():
+                try:
+                    shutil.move(str(final_video_path), str(archive_dir / final_video_path.name))
+                    print(f"Moved: {final_video_path.name}")
+                except Exception as e:
+                    print(f"[ERROR] Failed to move {final_video_path.name}: {e}")
 
         # 5. Handle Generated Images (Move all to archive/generated_images)
         images_dir = self.base_dir / "data/images/generated_images"
@@ -403,6 +481,28 @@ class BaseHandler(ABC):
             except Exception as e:
                 print(f"[ERROR] Failed to move images: {e}")
         else:
-            print(f"[WARNING] Images directory not found: {images_dir}")
+             pass
 
         print("\n✅ Project archive and cleanup completed successfully.")
+
+
+class VideoHandler(BaseHandler):
+    """Concrete implementation for video production pipeline."""
+    pass
+
+
+if __name__ == "__main__":
+    import sys
+    
+    handler = VideoHandler()
+    
+    if len(sys.argv) < 2:
+        print("Usage: python -m src.handlers.video_handler <command>")
+        print("\nAvailable commands:")
+        for cmd in handler.commands.keys():
+            print(f"  - {cmd}")
+        sys.exit(1)
+    
+    command = sys.argv[1]
+    handler.execute(command)
+

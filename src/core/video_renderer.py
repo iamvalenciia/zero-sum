@@ -51,30 +51,45 @@ except ImportError as e:
 class VideoConfig:
     """Configuration class for video assembly parameters"""
     
-    def __init__(self):
+    def __init__(self, mode: str = "long", title_text: str = ""):
+        self.mode = mode # "long" or "shorts"
+        
         # Video dimensions
-        self.video_width = 3840
-        self.video_height = 2160
-        self.fps = 30  # Increased to 30 for smoother playback, or keep 12 if style dictates
+        if self.mode == "shorts":
+            self.video_width = 1080
+            self.video_height = 1920
+            self.ctx_img_size = 800 # Smaller for shorts
+        else:
+            self.video_width = 3840
+            self.video_height = 2160
+            self.ctx_img_size = 1000
+
+        self.fps = 30
         
         # Background
         self.background_color = (0, 0, 0)
 
         # Image positioning
-        self.image_width = 2160    # Full height-based width (approx)
+        self.image_width = self.video_width    # Full width
         
         # --- AUDIO CONFIGURATION ---
         self.narration_volume = 1    # Narration volume (0.0-2.0)
-        self.music_volume = 0.3       # Soft piano background (harmonic for students)
+        self.music_volume = 0.3       # Soft piano background
+        
+        # Title Overlay (Shorts)
+        self.title_text = title_text
+        self.title_font_size = 80 if self.mode == "shorts" else 100
+        self.title_color = (255, 255, 255, 255)
+        self.title_y_pos = 150 # From top
         
         # Encoding settings
         self.video_codec = 'hevc_nvenc' # or 'h264_nvenc'
         self.audio_codec = 'aac'
-        self.video_bitrate = 20000000  # 20 Mbps
-        self.audio_bitrate = 192000   # 192 kbps
+        self.video_bitrate = 20000000 if self.mode == "long" else 12000000
+        self.audio_bitrate = 192000
 
         # --- CONTEXTUAL IMAGE CONFIG ---
-        self.ctx_img_size = 1000        # INCREASED from 800 (25% increase)
+        # self.ctx_img_size is set above based on mode
         self.ctx_corner_radius = 30   # Radius for rounded corners
         self.ctx_border_width = 15     # Width of white border
         self.ctx_border_color = (255, 255, 255, 255)
@@ -194,7 +209,7 @@ class VideoAssembler:
                     # We want to loop the music enough times to cover narration + 19s.
                     # Then we will process it to double volume in the last 19s part.
                     
-                    tail_duration = 19.0
+                    tail_duration = 0.0 if self.config.mode == "shorts" else 6.0
                     total_required_duration = narration_duration + tail_duration
                     
                     # Create a long enough music track by looping
@@ -723,7 +738,12 @@ class VideoAssembler:
                                 
                                 # Determine target size and load image
                                 if is_fullscreen:
-                                    target_w = int(self.config.video_width * 0.7) # 70% width
+                                    # Conditional Sizing: 90% for Shorts, 40% for Long
+                                    if self.config.mode == "shorts":
+                                        target_w = int(self.config.video_width * 0.90)
+                                    else:
+                                        target_w = int(self.config.video_width * 0.40)
+
                                     c_img = get_contextual_image(ctx_data.get("path"), target_width_px=target_w)
                                     is_fullscreen_active = True
                                 else:
@@ -791,6 +811,35 @@ class VideoAssembler:
                         if cap_img:
                             base_img.paste(cap_img, (0, 0), cap_img)
                     
+                    # --- TITLE OVERLAY (FOR SHORTS) ---
+                    if self.config.title_text:
+                        from PIL import ImageFont
+                        draw = ImageDraw.Draw(base_img)
+                        # Attempt to load a nice font, fallback to default
+                        try:
+                            # Try to find a system font or use a bundled one
+                            font = ImageFont.truetype("arial.ttf", self.config.title_font_size)
+                        except:
+                            font = ImageFont.load_default()
+                        
+                        # Calculate text size for centering
+                        # Pillow 10+ uses getbbox or textbbox, older uses textsize
+                        try:
+                             left, top, right, bottom = draw.textbbox((0, 0), self.config.title_text, font=font)
+                             text_w = right - left
+                             text_h = bottom - top
+                        except:
+                             # Legacy fallback
+                             text_w, text_h = draw.textsize(self.config.title_text, font=font)
+                        
+                        text_x = (self.config.video_width - text_w) // 2
+                        text_y = self.config.title_y_pos
+                        
+                        # Draw Text Shadow/Outline for readability
+                        outline_color = (0, 0, 0, 255)
+                        stroke_width = 3
+                        draw.text((text_x, text_y), self.config.title_text, font=font, fill=self.config.title_color, 
+                                  stroke_width=stroke_width, stroke_fill=outline_color)
 
                     
                     # Conversión final - reuse buffer when no modifications

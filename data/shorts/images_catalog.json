@@ -1,0 +1,125 @@
+[
+    {
+        "id": "analyst_close",
+        "character": "analyst",
+        "type": "close",
+        "description": "Close-up portrait of Analyst with calm expression. Use for testimony, profound truths, whispers.",
+        "emotion_triggers": [
+            "[softly]",
+            "[whispers]",
+            "[reverently]",
+            "[with conviction]"
+        ],
+        "closed": {
+            "image_id": 1,
+            "name": "CloseMouth_Closed",
+            "path": "data/shorts/images/analyst/close_view/CloseMouth_Closed.jpeg"
+        },
+        "open": {
+            "image_id": 2,
+            "name": "CloseMouth_Open",
+            "path": "data/shorts/images/analyst/close_view/CloseMouth_Open.jpeg"
+        }
+    },
+    {
+        "id": "analyst_front",
+        "character": "analyst",
+        "type": "front",
+        "description": "Medium shot of Analyst facing viewer. Default pose for teaching and explaining doctrine.",
+        "emotion_triggers": [
+            "[warmly]",
+            "[smiling]",
+            "default"
+        ],
+        "closed": {
+            "image_id": 3,
+            "name": "FrontMouth_Closed",
+            "path": "data/shorts/images/analyst/front_view/FrontMouth_Closed.jpeg"
+        },
+        "open": {
+            "image_id": 4,
+            "name": "FrontMouth_Open",
+            "path": "data/shorts/images/analyst/front_view/FrontMouth_Open.jpeg"
+        }
+    },
+    {
+        "id": "analyst_pov",
+        "character": "analyst",
+        "description": "A POV shot captures the analyst from below, looking upward with a calm expression against a soft sky background.",
+        "closed": {
+            "image_id": 5,
+            "name": "PovMouth_Closed",
+            "path": "data/shorts/images/analyst/pov_view/PovMouth_Closed.jpeg"
+        },
+        "open": {
+            "image_id": 6,
+            "name": "PovMouth_Open",
+            "path": "data/shorts/images/analyst/pov_view/PovMouth_Open.jpeg"
+        }
+    },
+    {
+        "id": "skeptic_close",
+        "character": "skeptic",
+        "type": "close",
+        "description": "Close-up of Skeptic. Use for realization moments, strong emotion, confusion.",
+        "emotion_triggers": [
+            "[realizing]",
+            "[surprised]",
+            "[nervous laugh]",
+            "emotional"
+        ],
+        "closed": {
+            "image_id": 7,
+            "name": "CloseMouth_Closed",
+            "path": "data/shorts/images/skeptic/close_view/CloseMouth_Closed.jpeg"
+        },
+        "open": {
+            "image_id": 8,
+            "name": "CloseMouth_Open",
+            "path": "data/shorts/images/skeptic/close_view/CloseMouth_Open.jpeg"
+        }
+    },
+    {
+        "id": "skeptic_front",
+        "character": "skeptic",
+        "type": "front",
+        "description": "Medium shot of Skeptic facing viewer. Default pose for asking questions and general dialogue.",
+        "emotion_triggers": [
+            "[curious]",
+            "asking",
+            "default"
+        ],
+        "closed": {
+            "image_id": 9,
+            "name": "FrontMouth_Close",
+            "path": "data/shorts/images/skeptic/front_view/FrontMouth_Close.jpeg"
+        },
+        "open": {
+            "image_id": 10,
+            "name": "FrontMouth_Open",
+            "path": "data/shorts/images/skeptic/front_view/FrontMouth_Open.jpeg"
+        }
+    },
+    {
+        "id": "skeptic_side",
+        "character": "skeptic",
+        "type": "side",
+        "description": "Side profile of Skeptic. Use for thinking, reflecting, hesitation moments.",
+        "emotion_triggers": [
+            "[thoughtfully]",
+            "[pondering]",
+            "[sighs]",
+            "reflecting"
+        ],
+        "closed": {
+            "image_id": 11,
+            "name": "SideMouth_Closed",
+            "path": "data/shorts/images/skeptic/side_view/SideMouth_Closed.jpeg"
+        },
+        "open": {
+            "image_id": 12,
+            "name": "SideMouth_Open",
+            "path": "data/shorts/images/skeptic/side_view/SideMouth_Open.jpeg"
+        }
+    }
+]

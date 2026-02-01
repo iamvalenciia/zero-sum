@@ -1,0 +1,209 @@
+{
+  "id": "finding_peace_bednar",
+  "topic": "Finding Peace in Troubled Times - Elder Bednar's Teachings",
+  "hook_text": "How do you find peace?",
+  "language": "en",
+  "duration_target_seconds": 75,
+  "sources": [
+    {
+      "talk": "Be Still, and Know That I Am God",
+      "speaker": "Elder David A. Bednar",
+      "date": "April 2024 General Conference",
+      "url": "https://www.churchofjesuschrist.org/study/general-conference/2024/04/21bednar"
+    },
+    {
+      "talk": "In the Space of Not Many Years",
+      "speaker": "Elder David A. Bednar",
+      "date": "October 2024 General Conference",
+      "url": "https://www.churchofjesuschrist.org/study/general-conference/2024/10/35bednar"
+    }
+  ],
+  "verified_quotes": [
+    {
+      "quote": "I testify that as we walk in the meekness of the Lord's Spirit, we will avoid and overcome pride and have peace in Him.",
+      "source": "Elder David A. Bednar, October 2024 General Conference",
+      "verified": true
+    },
+    {
+      "quote": "Let your hearts be comforted concerning Zion; for all flesh is in mine hands; be still and know that I am God.",
+      "source": "D&C 101:16, quoted by Elder Bednar in April 2024 General Conference",
+      "verified": true
+    },
+    {
+      "quote": "I promise that as we build the foundation of our lives on the 'rock' of Jesus Christ, we can be blessed by the Holy Ghost to receive an individual and spiritual stillness of the soul.",
+      "source": "Elder David A. Bednar, April 2024 General Conference",
+      "verified": true
+    }
+  ],
+  "opening_visual": {
+    "image_prompt": "Vector illustration: A serene person standing on a solid rock foundation while turbulent storms and waves crash around them. Soft golden light breaks through dark clouds above. Modern clean LDS aesthetic, peaceful and hopeful mood.",
+    "duration_seconds": 3,
+    "text_overlay": "How do you find peace?"
+  },
+  "dialogue": [
+    {
+      "character": "Brother Marcus",
+      "text": "[sighs] ...with everything happening in the world right now... the wars, the conflicts, the anger everywhere... [thoughtfully] how are we supposed to find peace in all of this?",
+      "character_poses": [
+        {
+          "pose_id": "brother_marcus_side",
+          "start_word_index": 0,
+          "end_word_index": 12
+        },
+        {
+          "pose_id": "brother_marcus_close",
+          "start_word_index": 13,
+          "end_word_index": 24
+        }
+      ],
+      "visual_assets": null
+    },
+    {
+      "character": "Sister Faith",
+      "text": "[warmly] That is exactly what Elder Bednar addressed in the last two General Conferences... [softly] He reminded us of a powerful promise from scripture.",
+      "character_poses": [
+        {
+          "pose_id": "sister_faith_front",
+          "start_word_index": 0,
+          "end_word_index": 12
+        },
+        {
+          "pose_id": "sister_faith_close",
+          "start_word_index": 13,
+          "end_word_index": 22
+        }
+      ],
+      "visual_assets": [
+        {
+          "visual_asset_id": "1a",
+          "image_prompt": "Vector illustration: Elder David A. Bednar speaking at General Conference podium. Clean modern style, warm lighting, Conference Center background."
+        }
+      ]
+    },
+    {
+      "character": "Brother Marcus",
+      "text": "[curious] What promise?",
+      "character_poses": [
+        {
+          "pose_id": "brother_marcus_front",
+          "start_word_index": 0,
+          "end_word_index": 2
+        }
+      ],
+      "visual_assets": null
+    },
+    {
+      "character": "Sister Faith",
+      "text": "[reverently] The Lord said in Doctrine and Covenants section one oh one... 'Let your hearts be comforted... for all flesh is in mine hands... be still and know that I am God.'",
+      "character_poses": [
+        {
+          "pose_id": "sister_faith_close",
+          "start_word_index": 0,
+          "end_word_index": 28
+        }
+      ],
+      "visual_assets": [
+        {
+          "visual_asset_id": "2a",
+          "image_prompt": "Vector illustration: An open book of scripture with soft divine light emanating from the pages. Clean modern style, peaceful atmosphere."
+        }
+      ]
+    },
+    {
+      "character": "Brother Marcus",
+      "text": "[pondering] Be still... [realizing] but how do we do that when everything around us is chaos?",
+      "character_poses": [
+        {
+          "pose_id": "brother_marcus_side",
+          "start_word_index": 0,
+          "end_word_index": 3
+        },
+        {
+          "pose_id": "brother_marcus_close",
+          "start_word_index": 4,
+          "end_word_index": 14
+        }
+      ],
+      "visual_assets": null
+    },
+    {
+      "character": "Sister Faith",
+      "text": "[with conviction] Elder Bednar taught that 'be still' means more than just being quiet... [warmly] It means to remember and rely upon the Lord and His power at all times.",
+      "character_poses": [
+        {
+          "pose_id": "sister_faith_front",
+          "start_word_index": 0,
+          "end_word_index": 14
+        },
+        {
+          "pose_id": "sister_faith_close",
+          "start_word_index": 15,
+          "end_word_index": 28
+        }
+      ],
+      "visual_assets": [
+        {
+          "visual_asset_id": "3a",
+          "image_prompt": "Vector illustration: A person kneeling in peaceful prayer with soft golden light surrounding them. Modern clean LDS aesthetic, contemplative mood."
+        }
+      ]
+    },
+    {
+      "character": "Sister Faith",
+      "text": "[softly] He promised that as we build the foundation of our lives on the rock of Jesus Christ... we can receive an individual and spiritual stillness of the soul.",
+      "character_poses": [
+        {
+          "pose_id": "sister_faith_close",
+          "start_word_index": 0,
+          "end_word_index": 27
+        }
+      ],
+      "visual_assets": [
+        {
+          "visual_asset_id": "4a",
+          "image_prompt": "Vector illustration: A foundation being built on a solid rock with Jesus Christ symbolized as light at the center. Storm clouds in background but calm in the center. Modern clean style."
+        }
+      ]
+    },
+    {
+      "character": "Brother Marcus",
+      "text": "[realizing] So the peace... it comes from within... from our connection to Christ.",
+      "character_poses": [
+        {
+          "pose_id": "brother_marcus_close",
+          "start_word_index": 0,
+          "end_word_index": 12
+        }
+      ],
+      "visual_assets": null
+    },
+    {
+      "character": "Sister Faith",
+      "text": "[reverently] Elder Bednar testified... 'As we walk in the meekness of the Lord's Spirit, we will avoid and overcome pride and have peace in Him.' [deep breath] ...in Him.",
+      "character_poses": [
+        {
+          "pose_id": "sister_faith_close",
+          "start_word_index": 0,
+          "end_word_index": 26
+        }
+      ],
+      "visual_assets": [
+        {
+          "visual_asset_id": "5a",
+          "image_prompt": "Vector illustration: Silhouette of a person with hands raised toward heaven with soft divine light streaming down. Peaceful, hopeful mood. Modern clean LDS aesthetic."
+        }
+      ]
+    }
+  ],
+  "call_to_action": "Where do you find your peace? Comment below.",
+  "hashtags": [
+    "#LDS",
+    "#ElderBednar",
+    "#FindPeace",
+    "#GeneralConference",
+    "#JesusChrist",
+    "#BeStill",
+    "#LatterDaySaints",
+    "#Faith"
+  ]
+}

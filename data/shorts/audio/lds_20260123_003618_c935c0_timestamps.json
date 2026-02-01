@@ -1,267 +1,947 @@
 {
-  "audio_file": "C:\\Users\\juanf\\OneDrive\\Escritorio\\zero-sum-yt\\data\\shorts\\audio\\lds_20260123_003618_c935c0.mp3",
+  "audio_file": "C:\\Users\\juanf\\OneDrive\\Escritorio\\zero-sum-yt\\data\\audio\\elevenlabs\\dialogue.mp3",
   "language": "en",
   "full_transcript": "What's happening in the world right now? The wars, the conflicts, the anger everywhere? How are we supposed to find peace in all of this? That is exactly what Elder Bednar addressed in the last two general conferences. He reminded us of a powerful promise from Scripture. What promise? The Lord said in Doctrine and Covenant Section 101, Let your hearts be comforted. For all flesh is in mine hands. Be still and know that I am God. Be still. But how do we do that when everything around us is chaos? Elder Bednar taught that be still means more than just being quiet. It means to remember and rely upon the Lord and His power at all times. He promised that as we build the foundation of our lives on the rock of Jesus Christ, we can receive an individual and spiritual stillness of the soul. So the peace, it comes from within, from our connection to Christ. Elder Bednar testified, as we walk in the meekness of the Lord's Spirit, we will avoid and overcome pride and have peace in Him. In Him.",
-  "segments": [
+  "words": [
     {
-      "character": "Brother Marcus",
-      "text": "What's happening in the world right now? The wars, the conflicts, the anger everywhere? How are we supposed to find peace in all of this?",
+      "word": "whats",
       "start": 0.0,
-      "end": 9.48,
-      "words": [
-        {"word": "whats", "start": 0.0, "end": 0.98},
-        {"word": "happening", "start": 0.98, "end": 1.48},
-        {"word": "in", "start": 0.98, "end": 1.48},
-        {"word": "the", "start": 1.48, "end": 1.54},
-        {"word": "world", "start": 1.54, "end": 1.72},
-        {"word": "right", "start": 1.72, "end": 1.94},
-        {"word": "now", "start": 1.94, "end": 2.22},
-        {"word": "the", "start": 3.04, "end": 3.26},
-        {"word": "wars", "start": 3.26, "end": 3.58},
-        {"word": "the", "start": 3.9, "end": 3.96},
-        {"word": "conflicts", "start": 3.96, "end": 4.46},
-        {"word": "the", "start": 4.8, "end": 4.88},
-        {"word": "anger", "start": 4.88, "end": 5.18},
-        {"word": "everywhere", "start": 5.18, "end": 5.66},
-        {"word": "how", "start": 7.17, "end": 7.46},
-        {"word": "are", "start": 7.46, "end": 7.58},
-        {"word": "we", "start": 7.58, "end": 7.68},
-        {"word": "supposed", "start": 7.68, "end": 7.96},
-        {"word": "to", "start": 7.96, "end": 8.18},
-        {"word": "find", "start": 8.18, "end": 8.38},
-        {"word": "peace", "start": 8.38, "end": 8.7},
-        {"word": "in", "start": 8.7, "end": 8.96},
-        {"word": "all", "start": 8.96, "end": 9.12},
-        {"word": "of", "start": 9.12, "end": 9.26},
-        {"word": "this", "start": 9.26, "end": 9.48}
-      ]
+      "end": 0.98
     },
     {
-      "character": "Sister Faith",
-      "text": "That is exactly what Elder Bednar addressed in the last two general conferences. He reminded us of a powerful promise from Scripture.",
+      "word": "happening",
+      "start": 0.98,
+      "end": 0.98
+    },
+    {
+      "word": "in",
+      "start": 0.98,
+      "end": 1.48
+    },
+    {
+      "word": "the",
+      "start": 1.48,
+      "end": 1.54
+    },
+    {
+      "word": "world",
+      "start": 1.54,
+      "end": 1.72
+    },
+    {
+      "word": "right",
+      "start": 1.72,
+      "end": 1.94
+    },
+    {
+      "word": "now",
+      "start": 1.94,
+      "end": 2.22
+    },
+    {
+      "word": "the",
+      "start": 3.04,
+      "end": 3.26
+    },
+    {
+      "word": "wars",
+      "start": 3.26,
+      "end": 3.58
+    },
+    {
+      "word": "the",
+      "start": 3.9,
+      "end": 3.96
+    },
+    {
+      "word": "conflicts",
+      "start": 3.96,
+      "end": 4.46
+    },
+    {
+      "word": "the",
+      "start": 4.8,
+      "end": 4.88
+    },
+    {
+      "word": "anger",
+      "start": 4.88,
+      "end": 5.18
+    },
+    {
+      "word": "everywhere",
+      "start": 5.18,
+      "end": 5.66
+    },
+    {
+      "word": "how",
+      "start": 7.17,
+      "end": 7.46
+    },
+    {
+      "word": "are",
+      "start": 7.46,
+      "end": 7.58
+    },
+    {
+      "word": "we",
+      "start": 7.58,
+      "end": 7.68
+    },
+    {
+      "word": "supposed",
+      "start": 7.68,
+      "end": 7.96
+    },
+    {
+      "word": "to",
+      "start": 7.96,
+      "end": 8.18
+    },
+    {
+      "word": "find",
+      "start": 8.18,
+      "end": 8.38
+    },
+    {
+      "word": "peace",
+      "start": 8.38,
+      "end": 8.7
+    },
+    {
+      "word": "in",
+      "start": 8.7,
+      "end": 8.96
+    },
+    {
+      "word": "all",
+      "start": 8.96,
+      "end": 9.12
+    },
+    {
+      "word": "of",
+      "start": 9.12,
+      "end": 9.26
+    },
+    {
+      "word": "this",
+      "start": 9.26,
+      "end": 9.48
+    },
+    {
+      "word": "that",
       "start": 10.78,
-      "end": 17.98,
-      "words": [
-        {"word": "that", "start": 10.78, "end": 11.0},
-        {"word": "is", "start": 11.0, "end": 11.14},
-        {"word": "exactly", "start": 11.14, "end": 11.66},
-        {"word": "what", "start": 11.66, "end": 11.88},
-        {"word": "elder", "start": 11.88, "end": 12.16},
-        {"word": "bednar", "start": 12.16, "end": 12.52},
-        {"word": "addressed", "start": 12.52, "end": 12.88},
-        {"word": "in", "start": 12.88, "end": 13.1},
-        {"word": "the", "start": 13.1, "end": 13.2},
-        {"word": "last", "start": 13.2, "end": 13.4},
-        {"word": "two", "start": 13.4, "end": 13.66},
-        {"word": "general", "start": 13.66, "end": 13.96},
-        {"word": "conferences", "start": 13.96, "end": 14.52},
-        {"word": "he", "start": 15.3, "end": 15.5},
-        {"word": "reminded", "start": 15.5, "end": 15.94},
-        {"word": "us", "start": 15.94, "end": 16.22},
-        {"word": "of", "start": 16.22, "end": 16.34},
-        {"word": "a", "start": 16.34, "end": 16.44},
-        {"word": "powerful", "start": 16.44, "end": 16.84},
-        {"word": "promise", "start": 16.84, "end": 17.3},
-        {"word": "from", "start": 17.3, "end": 17.56},
-        {"word": "scripture", "start": 17.56, "end": 17.98}
-      ]
+      "end": 11.0
     },
     {
-      "character": "Brother Marcus",
-      "text": "What promise?",
+      "word": "is",
+      "start": 11.0,
+      "end": 11.14
+    },
+    {
+      "word": "exactly",
+      "start": 11.14,
+      "end": 11.66
+    },
+    {
+      "word": "what",
+      "start": 11.66,
+      "end": 11.88
+    },
+    {
+      "word": "elder",
+      "start": 11.88,
+      "end": 12.16
+    },
+    {
+      "word": "bednar",
+      "start": 12.16,
+      "end": 12.52
+    },
+    {
+      "word": "addressed",
+      "start": 12.52,
+      "end": 12.88
+    },
+    {
+      "word": "in",
+      "start": 12.88,
+      "end": 13.1
+    },
+    {
+      "word": "the",
+      "start": 13.1,
+      "end": 13.2
+    },
+    {
+      "word": "last",
+      "start": 13.2,
+      "end": 13.4
+    },
+    {
+      "word": "two",
+      "start": 13.4,
+      "end": 13.66
+    },
+    {
+      "word": "general",
+      "start": 13.66,
+      "end": 13.96
+    },
+    {
+      "word": "conferences",
+      "start": 13.96,
+      "end": 14.52
+    },
+    {
+      "word": "he",
+      "start": 15.3,
+      "end": 15.5
+    },
+    {
+      "word": "reminded",
+      "start": 15.5,
+      "end": 15.94
+    },
+    {
+      "word": "us",
+      "start": 15.94,
+      "end": 16.22
+    },
+    {
+      "word": "of",
+      "start": 16.22,
+      "end": 16.34
+    },
+    {
+      "word": "a",
+      "start": 16.34,
+      "end": 16.44
+    },
+    {
+      "word": "powerful",
+      "start": 16.44,
+      "end": 16.84
+    },
+    {
+      "word": "promise",
+      "start": 16.84,
+      "end": 17.3
+    },
+    {
+      "word": "from",
+      "start": 17.3,
+      "end": 17.56
+    },
+    {
+      "word": "scripture",
+      "start": 17.56,
+      "end": 17.98
+    },
+    {
+      "word": "what",
       "start": 18.6,
-      "end": 19.4,
-      "words": [
-        {"word": "what", "start": 18.6, "end": 19.06},
-        {"word": "promise", "start": 19.06, "end": 19.4}
-      ]
+      "end": 19.06
     },
     {
-      "character": "Sister Faith",
-      "text": "The Lord said in Doctrine and Covenants section one oh one... Let your hearts be comforted. For all flesh is in mine hands. Be still and know that I am God.",
+      "word": "promise",
+      "start": 19.06,
+      "end": 19.4
+    },
+    {
+      "word": "the",
       "start": 20.24,
-      "end": 30.5,
-      "words": [
-        {"word": "the", "start": 20.24, "end": 20.44},
-        {"word": "lord", "start": 20.44, "end": 20.66},
-        {"word": "said", "start": 20.66, "end": 20.96},
-        {"word": "in", "start": 20.96, "end": 21.14},
-        {"word": "doctrine", "start": 21.14, "end": 21.5},
-        {"word": "and", "start": 21.5, "end": 21.66},
-        {"word": "covenant", "start": 21.66, "end": 21.96},
-        {"word": "section", "start": 21.96, "end": 22.38},
-        {"word": "one", "start": 22.38, "end": 22.52},
-        {"word": "hundred", "start": 22.52, "end": 22.66},
-        {"word": "and", "start": 22.66, "end": 22.8},
-        {"word": "one", "start": 22.8, "end": 22.94},
-        {"word": "let", "start": 22.94, "end": 23.9},
-        {"word": "your", "start": 23.9, "end": 24.12},
-        {"word": "hearts", "start": 24.12, "end": 24.4},
-        {"word": "be", "start": 24.4, "end": 24.62},
-        {"word": "comforted", "start": 24.62, "end": 25.22},
-        {"word": "for", "start": 25.5, "end": 25.6},
-        {"word": "all", "start": 25.6, "end": 25.94},
-        {"word": "flesh", "start": 25.94, "end": 26.32},
-        {"word": "is", "start": 26.32, "end": 26.6},
-        {"word": "in", "start": 26.6, "end": 26.72},
-        {"word": "mine", "start": 26.72, "end": 26.92},
-        {"word": "hands", "start": 26.92, "end": 27.2},
-        {"word": "be", "start": 28.04, "end": 28.16},
-        {"word": "still", "start": 28.16, "end": 28.54},
-        {"word": "and", "start": 28.54, "end": 29.06},
-        {"word": "know", "start": 29.06, "end": 29.4},
-        {"word": "that", "start": 29.4, "end": 29.74},
-        {"word": "i", "start": 29.74, "end": 30.02},
-        {"word": "am", "start": 30.02, "end": 30.18},
-        {"word": "god", "start": 30.18, "end": 30.5}
-      ]
+      "end": 20.44
     },
     {
-      "character": "Brother Marcus",
-      "text": "Be still... But how do we do that when everything around us is chaos?",
+      "word": "lord",
+      "start": 20.44,
+      "end": 20.66
+    },
+    {
+      "word": "said",
+      "start": 20.66,
+      "end": 20.96
+    },
+    {
+      "word": "in",
+      "start": 20.96,
+      "end": 21.14
+    },
+    {
+      "word": "doctrine",
+      "start": 21.14,
+      "end": 21.5
+    },
+    {
+      "word": "and",
+      "start": 21.5,
+      "end": 21.66
+    },
+    {
+      "word": "covenant",
+      "start": 21.66,
+      "end": 21.96
+    },
+    {
+      "word": "section",
+      "start": 21.96,
+      "end": 22.38
+    },
+    {
+      "word": "one",
+      "start": 22.38,
+      "end": 22.52
+    },
+    {
+      "word": "hundred",
+      "start": 22.52,
+      "end": 22.66
+    },
+    {
+      "word": "and",
+      "start": 22.66,
+      "end": 22.8
+    },
+    {
+      "word": "one",
+      "start": 22.8,
+      "end": 22.94
+    },
+    {
+      "word": "let",
+      "start": 22.94,
+      "end": 23.9
+    },
+    {
+      "word": "your",
+      "start": 23.9,
+      "end": 24.12
+    },
+    {
+      "word": "hearts",
+      "start": 24.12,
+      "end": 24.4
+    },
+    {
+      "word": "be",
+      "start": 24.4,
+      "end": 24.62
+    },
+    {
+      "word": "comforted",
+      "start": 24.62,
+      "end": 25.22
+    },
+    {
+      "word": "for",
+      "start": 25.5,
+      "end": 25.6
+    },
+    {
+      "word": "all",
+      "start": 25.6,
+      "end": 25.94
+    },
+    {
+      "word": "flesh",
+      "start": 25.94,
+      "end": 26.32
+    },
+    {
+      "word": "is",
+      "start": 26.32,
+      "end": 26.6
+    },
+    {
+      "word": "in",
+      "start": 26.6,
+      "end": 26.72
+    },
+    {
+      "word": "mine",
+      "start": 26.72,
+      "end": 26.92
+    },
+    {
+      "word": "hands",
+      "start": 26.92,
+      "end": 27.2
+    },
+    {
+      "word": "be",
+      "start": 28.04,
+      "end": 28.16
+    },
+    {
+      "word": "still",
+      "start": 28.16,
+      "end": 28.54
+    },
+    {
+      "word": "and",
+      "start": 28.54,
+      "end": 29.06
+    },
+    {
+      "word": "know",
+      "start": 29.06,
+      "end": 29.4
+    },
+    {
+      "word": "that",
+      "start": 29.4,
+      "end": 29.74
+    },
+    {
+      "word": "i",
+      "start": 29.74,
+      "end": 30.02
+    },
+    {
+      "word": "am",
+      "start": 30.02,
+      "end": 30.18
+    },
+    {
+      "word": "god",
+      "start": 30.18,
+      "end": 30.5
+    },
+    {
+      "word": "be",
       "start": 31.34,
-      "end": 35.92,
-      "words": [
-        {"word": "be", "start": 31.34, "end": 31.64},
-        {"word": "still", "start": 31.64, "end": 32.1},
-        {"word": "but", "start": 33.04, "end": 33.6},
-        {"word": "how", "start": 33.6, "end": 33.78},
-        {"word": "do", "start": 33.78, "end": 33.88},
-        {"word": "we", "start": 33.88, "end": 34.0},
-        {"word": "do", "start": 34.0, "end": 34.22},
-        {"word": "that", "start": 34.22, "end": 34.42},
-        {"word": "when", "start": 34.42, "end": 34.56},
-        {"word": "everything", "start": 34.56, "end": 34.92},
-        {"word": "around", "start": 34.92, "end": 35.24},
-        {"word": "us", "start": 35.24, "end": 35.44},
-        {"word": "is", "start": 35.44, "end": 35.58},
-        {"word": "chaos", "start": 35.58, "end": 35.92}
-      ]
+      "end": 31.64
     },
     {
-      "character": "Sister Faith",
-      "text": "Elder Bednar taught that be still means more than just being quiet. It means to remember and rely upon the Lord and His power at all times.",
+      "word": "still",
+      "start": 31.64,
+      "end": 32.1
+    },
+    {
+      "word": "but",
+      "start": 33.04,
+      "end": 33.6
+    },
+    {
+      "word": "how",
+      "start": 33.6,
+      "end": 33.78
+    },
+    {
+      "word": "do",
+      "start": 33.78,
+      "end": 33.88
+    },
+    {
+      "word": "we",
+      "start": 33.88,
+      "end": 34.0
+    },
+    {
+      "word": "do",
+      "start": 34.0,
+      "end": 34.22
+    },
+    {
+      "word": "that",
+      "start": 34.22,
+      "end": 34.42
+    },
+    {
+      "word": "when",
+      "start": 34.42,
+      "end": 34.56
+    },
+    {
+      "word": "everything",
+      "start": 34.56,
+      "end": 34.92
+    },
+    {
+      "word": "around",
+      "start": 34.92,
+      "end": 35.24
+    },
+    {
+      "word": "us",
+      "start": 35.24,
+      "end": 35.44
+    },
+    {
+      "word": "is",
+      "start": 35.44,
+      "end": 35.58
+    },
+    {
+      "word": "chaos",
+      "start": 35.58,
+      "end": 35.92
+    },
+    {
+      "word": "elder",
       "start": 36.88,
-      "end": 45.96,
-      "words": [
-        {"word": "elder", "start": 36.88, "end": 37.22},
-        {"word": "bednar", "start": 37.22, "end": 37.6},
-        {"word": "taught", "start": 37.6, "end": 37.84},
-        {"word": "that", "start": 37.84, "end": 38.14},
-        {"word": "be", "start": 38.14, "end": 38.5},
-        {"word": "still", "start": 38.5, "end": 39.06},
-        {"word": "means", "start": 39.06, "end": 39.38},
-        {"word": "more", "start": 39.38, "end": 39.76},
-        {"word": "than", "start": 39.76, "end": 39.92},
-        {"word": "just", "start": 39.92, "end": 40.08},
-        {"word": "being", "start": 40.08, "end": 40.32},
-        {"word": "quiet", "start": 40.32, "end": 40.76},
-        {"word": "it", "start": 41.46, "end": 41.62},
-        {"word": "means", "start": 41.62, "end": 41.82},
-        {"word": "to", "start": 41.82, "end": 42.1},
-        {"word": "remember", "start": 42.1, "end": 42.58},
-        {"word": "and", "start": 42.58, "end": 42.88},
-        {"word": "rely", "start": 42.88, "end": 43.16},
-        {"word": "upon", "start": 43.16, "end": 43.58},
-        {"word": "the", "start": 43.58, "end": 43.74},
-        {"word": "lord", "start": 43.74, "end": 44.0},
-        {"word": "and", "start": 44.0, "end": 44.22},
-        {"word": "his", "start": 44.22, "end": 44.34},
-        {"word": "power", "start": 44.34, "end": 44.8},
-        {"word": "at", "start": 44.8, "end": 45.1},
-        {"word": "all", "start": 45.1, "end": 45.38},
-        {"word": "times", "start": 45.38, "end": 45.96}
-      ]
+      "end": 37.22
     },
     {
-      "character": "Sister Faith",
-      "text": "He promised that as we build the foundation of our lives on the rock of Jesus Christ, we can receive an individual and spiritual stillness of the soul.",
+      "word": "bednar",
+      "start": 37.22,
+      "end": 37.6
+    },
+    {
+      "word": "taught",
+      "start": 37.6,
+      "end": 37.84
+    },
+    {
+      "word": "that",
+      "start": 37.84,
+      "end": 38.14
+    },
+    {
+      "word": "be",
+      "start": 38.14,
+      "end": 38.5
+    },
+    {
+      "word": "still",
+      "start": 38.5,
+      "end": 39.06
+    },
+    {
+      "word": "means",
+      "start": 39.06,
+      "end": 39.38
+    },
+    {
+      "word": "more",
+      "start": 39.38,
+      "end": 39.76
+    },
+    {
+      "word": "than",
+      "start": 39.76,
+      "end": 39.92
+    },
+    {
+      "word": "just",
+      "start": 39.92,
+      "end": 40.08
+    },
+    {
+      "word": "being",
+      "start": 40.08,
+      "end": 40.32
+    },
+    {
+      "word": "quiet",
+      "start": 40.32,
+      "end": 40.76
+    },
+    {
+      "word": "it",
+      "start": 41.46,
+      "end": 41.62
+    },
+    {
+      "word": "means",
+      "start": 41.62,
+      "end": 41.82
+    },
+    {
+      "word": "to",
+      "start": 41.82,
+      "end": 42.1
+    },
+    {
+      "word": "remember",
+      "start": 42.1,
+      "end": 42.58
+    },
+    {
+      "word": "and",
+      "start": 42.58,
+      "end": 42.88
+    },
+    {
+      "word": "rely",
+      "start": 42.88,
+      "end": 43.16
+    },
+    {
+      "word": "upon",
+      "start": 43.16,
+      "end": 43.58
+    },
+    {
+      "word": "the",
+      "start": 43.58,
+      "end": 43.74
+    },
+    {
+      "word": "lord",
+      "start": 43.74,
+      "end": 44.0
+    },
+    {
+      "word": "and",
+      "start": 44.0,
+      "end": 44.22
+    },
+    {
+      "word": "his",
+      "start": 44.22,
+      "end": 44.34
+    },
+    {
+      "word": "power",
+      "start": 44.34,
+      "end": 44.8
+    },
+    {
+      "word": "at",
+      "start": 44.8,
+      "end": 45.1
+    },
+    {
+      "word": "all",
+      "start": 45.1,
+      "end": 45.38
+    },
+    {
+      "word": "times",
+      "start": 45.38,
+      "end": 45.96
+    },
+    {
+      "word": "he",
       "start": 46.62,
-      "end": 55.02,
-      "words": [
-        {"word": "he", "start": 46.62, "end": 46.84},
-        {"word": "promised", "start": 46.84, "end": 47.24},
-        {"word": "that", "start": 47.24, "end": 47.5},
-        {"word": "as", "start": 47.5, "end": 47.7},
-        {"word": "we", "start": 47.7, "end": 47.86},
-        {"word": "build", "start": 47.86, "end": 48.1},
-        {"word": "the", "start": 48.1, "end": 48.28},
-        {"word": "foundation", "start": 48.28, "end": 48.76},
-        {"word": "of", "start": 48.76, "end": 48.96},
-        {"word": "our", "start": 48.96, "end": 49.06},
-        {"word": "lives", "start": 49.06, "end": 49.4},
-        {"word": "on", "start": 49.4, "end": 49.62},
-        {"word": "the", "start": 49.62, "end": 49.74},
-        {"word": "rock", "start": 49.74, "end": 49.98},
-        {"word": "of", "start": 49.98, "end": 50.2},
-        {"word": "jesus", "start": 50.2, "end": 50.46},
-        {"word": "christ", "start": 50.46, "end": 51.02},
-        {"word": "we", "start": 51.02, "end": 51.62},
-        {"word": "can", "start": 51.62, "end": 51.78},
-        {"word": "receive", "start": 51.78, "end": 52.08},
-        {"word": "an", "start": 52.08, "end": 52.28},
-        {"word": "individual", "start": 52.28, "end": 52.86},
-        {"word": "and", "start": 52.86, "end": 53.16},
-        {"word": "spiritual", "start": 53.16, "end": 53.74},
-        {"word": "stillness", "start": 53.74, "end": 54.32},
-        {"word": "of", "start": 54.32, "end": 54.5},
-        {"word": "the", "start": 54.5, "end": 54.64},
-        {"word": "soul", "start": 54.64, "end": 55.02}
-      ]
+      "end": 46.84
     },
     {
-      "character": "Brother Marcus",
-      "text": "So the peace, it comes from within, from our connection to Christ.",
+      "word": "promised",
+      "start": 46.84,
+      "end": 47.24
+    },
+    {
+      "word": "that",
+      "start": 47.24,
+      "end": 47.5
+    },
+    {
+      "word": "as",
+      "start": 47.5,
+      "end": 47.7
+    },
+    {
+      "word": "we",
+      "start": 47.7,
+      "end": 47.86
+    },
+    {
+      "word": "build",
+      "start": 47.86,
+      "end": 48.1
+    },
+    {
+      "word": "the",
+      "start": 48.1,
+      "end": 48.28
+    },
+    {
+      "word": "foundation",
+      "start": 48.28,
+      "end": 48.76
+    },
+    {
+      "word": "of",
+      "start": 48.76,
+      "end": 48.96
+    },
+    {
+      "word": "our",
+      "start": 48.96,
+      "end": 49.06
+    },
+    {
+      "word": "lives",
+      "start": 49.06,
+      "end": 49.4
+    },
+    {
+      "word": "on",
+      "start": 49.4,
+      "end": 49.62
+    },
+    {
+      "word": "the",
+      "start": 49.62,
+      "end": 49.74
+    },
+    {
+      "word": "rock",
+      "start": 49.74,
+      "end": 49.98
+    },
+    {
+      "word": "of",
+      "start": 49.98,
+      "end": 50.2
+    },
+    {
+      "word": "jesus",
+      "start": 50.2,
+      "end": 50.46
+    },
+    {
+      "word": "christ",
+      "start": 50.46,
+      "end": 51.02
+    },
+    {
+      "word": "we",
+      "start": 51.02,
+      "end": 51.62
+    },
+    {
+      "word": "can",
+      "start": 51.62,
+      "end": 51.78
+    },
+    {
+      "word": "receive",
+      "start": 51.78,
+      "end": 52.08
+    },
+    {
+      "word": "an",
+      "start": 52.08,
+      "end": 52.28
+    },
+    {
+      "word": "individual",
+      "start": 52.28,
+      "end": 52.86
+    },
+    {
+      "word": "and",
+      "start": 52.86,
+      "end": 53.16
+    },
+    {
+      "word": "spiritual",
+      "start": 53.16,
+      "end": 53.74
+    },
+    {
+      "word": "stillness",
+      "start": 53.74,
+      "end": 54.32
+    },
+    {
+      "word": "of",
+      "start": 54.32,
+      "end": 54.5
+    },
+    {
+      "word": "the",
+      "start": 54.5,
+      "end": 54.64
+    },
+    {
+      "word": "soul",
+      "start": 54.64,
+      "end": 55.02
+    },
+    {
+      "word": "so",
       "start": 55.4,
-      "end": 59.9,
-      "words": [
-        {"word": "so", "start": 55.4, "end": 55.88},
-        {"word": "the", "start": 55.88, "end": 56.02},
-        {"word": "peace", "start": 56.02, "end": 56.3},
-        {"word": "it", "start": 56.84, "end": 57.24},
-        {"word": "comes", "start": 57.24, "end": 57.42},
-        {"word": "from", "start": 57.42, "end": 57.64},
-        {"word": "within", "start": 57.64, "end": 57.98},
-        {"word": "from", "start": 58.74, "end": 58.86},
-        {"word": "our", "start": 58.86, "end": 59.0},
-        {"word": "connection", "start": 59.0, "end": 59.28},
-        {"word": "to", "start": 59.28, "end": 59.46},
-        {"word": "christ", "start": 59.46, "end": 59.9}
-      ]
+      "end": 55.88
     },
     {
-      "character": "Sister Faith",
-      "text": "Elder Bednar testified, as we walk in the meekness of the Lord's Spirit, we will avoid and overcome pride and have peace in Him. In Him.",
+      "word": "the",
+      "start": 55.88,
+      "end": 56.02
+    },
+    {
+      "word": "peace",
+      "start": 56.02,
+      "end": 56.3
+    },
+    {
+      "word": "it",
+      "start": 56.84,
+      "end": 57.24
+    },
+    {
+      "word": "comes",
+      "start": 57.24,
+      "end": 57.42
+    },
+    {
+      "word": "from",
+      "start": 57.42,
+      "end": 57.64
+    },
+    {
+      "word": "within",
+      "start": 57.64,
+      "end": 57.98
+    },
+    {
+      "word": "from",
+      "start": 58.74,
+      "end": 58.86
+    },
+    {
+      "word": "our",
+      "start": 58.86,
+      "end": 59.0
+    },
+    {
+      "word": "connection",
+      "start": 59.0,
+      "end": 59.28
+    },
+    {
+      "word": "to",
+      "start": 59.28,
+      "end": 59.46
+    },
+    {
+      "word": "christ",
+      "start": 59.46,
+      "end": 59.9
+    },
+    {
+      "word": "elder",
       "start": 60.72,
-      "end": 69.76,
-      "words": [
-        {"word": "elder", "start": 60.72, "end": 60.98},
-        {"word": "bednar", "start": 60.98, "end": 61.32},
-        {"word": "testified", "start": 61.32, "end": 61.9},
-        {"word": "as", "start": 62.4, "end": 62.74},
-        {"word": "we", "start": 62.74, "end": 62.88},
-        {"word": "walk", "start": 62.88, "end": 63.16},
-        {"word": "in", "start": 63.16, "end": 63.34},
-        {"word": "the", "start": 63.34, "end": 63.46},
-        {"word": "meekness", "start": 63.46, "end": 63.82},
-        {"word": "of", "start": 63.82, "end": 63.96},
-        {"word": "the", "start": 63.96, "end": 64.08},
-        {"word": "lords", "start": 64.08, "end": 64.46},
-        {"word": "spirit", "start": 64.46, "end": 64.74},
-        {"word": "we", "start": 65.06, "end": 65.3},
-        {"word": "will", "start": 65.3, "end": 65.44},
-        {"word": "avoid", "start": 65.44, "end": 65.9},
-        {"word": "and", "start": 65.9, "end": 66.16},
-        {"word": "overcome", "start": 66.16, "end": 66.58},
-        {"word": "pride", "start": 66.58, "end": 67.14},
-        {"word": "and", "start": 67.14, "end": 67.4},
-        {"word": "have", "start": 67.4, "end": 67.54},
-        {"word": "peace", "start": 67.54, "end": 67.82},
-        {"word": "in", "start": 67.82, "end": 68.08},
-        {"word": "him", "start": 68.08, "end": 68.26},
-        {"word": "in", "start": 68.92, "end": 69.48},
-        {"word": "him", "start": 69.48, "end": 69.76}
-      ]
+      "end": 60.98
+    },
+    {
+      "word": "bednar",
+      "start": 60.98,
+      "end": 61.32
+    },
+    {
+      "word": "testified",
+      "start": 61.32,
+      "end": 61.9
+    },
+    {
+      "word": "as",
+      "start": 62.4,
+      "end": 62.74
+    },
+    {
+      "word": "we",
+      "start": 62.74,
+      "end": 62.88
+    },
+    {
+      "word": "walk",
+      "start": 62.88,
+      "end": 63.16
+    },
+    {
+      "word": "in",
+      "start": 63.16,
+      "end": 63.34
+    },
+    {
+      "word": "the",
+      "start": 63.34,
+      "end": 63.46
+    },
+    {
+      "word": "meekness",
+      "start": 63.46,
+      "end": 63.82
+    },
+    {
+      "word": "of",
+      "start": 63.82,
+      "end": 63.96
+    },
+    {
+      "word": "the",
+      "start": 63.96,
+      "end": 64.08
+    },
+    {
+      "word": "lords",
+      "start": 64.08,
+      "end": 64.46
+    },
+    {
+      "word": "spirit",
+      "start": 64.46,
+      "end": 64.74
+    },
+    {
+      "word": "we",
+      "start": 65.06,
+      "end": 65.3
+    },
+    {
+      "word": "will",
+      "start": 65.3,
+      "end": 65.44
+    },
+    {
+      "word": "avoid",
+      "start": 65.44,
+      "end": 65.9
+    },
+    {
+      "word": "and",
+      "start": 65.9,
+      "end": 66.16
+    },
+    {
+      "word": "overcome",
+      "start": 66.16,
+      "end": 66.58
+    },
+    {
+      "word": "pride",
+      "start": 66.58,
+      "end": 67.14
+    },
+    {
+      "word": "and",
+      "start": 67.14,
+      "end": 67.4
+    },
+    {
+      "word": "have",
+      "start": 67.4,
+      "end": 67.54
+    },
+    {
+      "word": "peace",
+      "start": 67.54,
+      "end": 67.82
+    },
+    {
+      "word": "in",
+      "start": 67.82,
+      "end": 68.08
+    },
+    {
+      "word": "him",
+      "start": 68.08,
+      "end": 68.26
+    },
+    {
+      "word": "in",
+      "start": 68.92,
+      "end": 69.48
+    },
+    {
+      "word": "him",
+      "start": 69.48,
+      "end": 69.76
     }
   ]
 }

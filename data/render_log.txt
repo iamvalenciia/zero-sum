@@ -1,0 +1,152 @@
+=== Render Log Started at 2026-01-30 12:44:03.441820 ===
+[2026-01-30 12:44:03][INFO] ============================================================
+[2026-01-30 12:44:03][INFO] EXECUTE_RENDER STARTED (v2.0 with lip-sync)
+[2026-01-30 12:44:03][INFO] Log file location: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\render_log.txt
+[2026-01-30 12:44:03][INFO] script_id: finding_peace_bednar
+[2026-01-30 12:44:03][INFO] hook_text: How do you find peace?
+[2026-01-30 12:44:03][INFO] opening_image: 
+[2026-01-30 12:44:03][INFO] output_filename: finding_peace_bednar_final
+[2026-01-30 12:44:03][INFO] ============================================================
+[2026-01-30 12:44:03][INFO] Step 0: Checking dependencies...
+[2026-01-30 12:44:03][INFO]   PyAV: OK
+[2026-01-30 12:44:03][INFO]   PIL: OK
+[2026-01-30 12:44:33][INFO]   numpy: OK
+[2026-01-30 12:44:33][INFO] All dependencies OK
+[2026-01-30 12:44:33][INFO] shorts_dir: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts
+[2026-01-30 12:44:33][INFO] base_dir: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt
+[2026-01-30 12:44:33][INFO] Step 1: Validating prerequisites...
+[2026-01-30 12:44:33][INFO] Running comprehensive pre-render validation...
+[2026-01-30 12:44:33][INFO] ----------------------------------------
+[2026-01-30 12:44:33][INFO]   [INFO] Script loaded: finding_peace_bednar
+[2026-01-30 12:44:33][INFO]   [INFO] Audio file found: finding_peace_bednar.mp3
+[2026-01-30 12:44:33][INFO]   [INFO] Timestamps file found: finding_peace_bednar_timestamps.json
+[2026-01-30 12:44:33][INFO]   [INFO] Characters in script: ['Analyst', 'Skeptic']
+[2026-01-30 12:44:33][INFO]   [INFO] Analyst: Found poses - close_view, front_view, pov_view
+[2026-01-30 12:44:33][INFO]   [INFO] Skeptic: Found poses - close_view, front_view, side_view
+[2026-01-30 12:44:33][INFO]   [INFO] Visual assets in script: ['1a', '2a', '3a', '4a', '5a']
+[2026-01-30 12:44:33][INFO]   [INFO] Image registry found
+[2026-01-30 12:44:33][INFO]   [INFO] Available images in shorts/images: ['1.jpeg', '2.jpeg', '4.jpeg', '5.jpeg', '6.jpeg', '3.png']
+[2026-01-30 12:44:33][INFO]   [INFO]   1a: Found matching image
+[2026-01-30 12:44:33][INFO]   [INFO]   2a: Found matching image
+[2026-01-30 12:44:33][INFO]   [INFO]   3a: Found matching image
+[2026-01-30 12:44:33][INFO]   [INFO]   4a: Found matching image
+[2026-01-30 12:44:33][INFO]   [INFO]   5a: Found matching image
+[2026-01-30 12:44:33][INFO] Validation result: All prerequisites validated successfully. Ready to render.
+[2026-01-30 12:44:33][INFO] ----------------------------------------
+[2026-01-30 12:44:33][INFO] Checking script: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\scripts\finding_peace_bednar.json
+[2026-01-30 12:44:33][INFO] Script found OK
+[2026-01-30 12:44:33][INFO] Checking audio: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\audio\finding_peace_bednar.mp3
+[2026-01-30 12:44:33][INFO] Audio found OK
+[2026-01-30 12:44:33][INFO] Checking timestamps: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\audio\finding_peace_bednar_timestamps.json
+[2026-01-30 12:44:33][INFO] Timestamps found OK
+[2026-01-30 12:44:33][INFO] Step 2: Loading data...
+[2026-01-30 12:44:33][INFO] Script loaded: 11 keys
+[2026-01-30 12:44:33][INFO] Timestamps loaded: 0 segments
+[2026-01-30 12:44:33][INFO] Step 3: Initializing ImageLoader...
+[2026-01-30 12:44:35][INFO] ImageLoader initialized: 6 poses loaded
+[2026-01-30 12:44:35][INFO]   - analyst_close
+[2026-01-30 12:44:35][INFO]   - analyst_front
+[2026-01-30 12:44:35][INFO]   - analyst_pov
+[2026-01-30 12:44:35][INFO]   - skeptic_close
+[2026-01-30 12:44:35][INFO]   - skeptic_front
+[2026-01-30 12:44:35][INFO]   - skeptic_side
+[2026-01-30 12:44:36][INFO] Image catalog validation OK
+[2026-01-30 12:44:36][INFO] Step 4: Building render timeline...
+[2026-01-30 12:44:36][INFO] Render timeline: 0 segments
+[2026-01-30 12:44:36][INFO] Step 5: Preparing output...
+[2026-01-30 12:44:36][INFO] Output path: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final.mp4
+[2026-01-30 12:44:36][INFO] Step 6: Creating ShortVideoRenderer...
+[2026-01-30 12:44:36][INFO] ShortVideoRenderer.__init__ starting...
+[2026-01-30 12:44:36][INFO] Video config: 1080x1920 @ 30fps
+[2026-01-30 12:44:36][INFO] Font path: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\font\GoogleSans-SemiBold.ttf (exists: True)
+[2026-01-30 12:44:36][INFO] Lip sync: enabled
+[2026-01-30 12:44:36][INFO] ShortVideoRenderer.__init__ complete
+[2026-01-30 12:44:36][INFO] Renderer created OK
+[2026-01-30 12:44:36][INFO] Step 7: Starting render...
+[2026-01-30 12:44:36][INFO] ==================================================
+[2026-01-30 12:44:36][INFO] ShortVideoRenderer.render() STARTING
+[2026-01-30 12:44:36][INFO] audio_path: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\audio\finding_peace_bednar.mp3
+[2026-01-30 12:44:36][INFO] hook_text: How do you find peace?
+[2026-01-30 12:44:36][INFO] output_path: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final.mp4
+[2026-01-30 12:44:36][INFO] render_timeline segments: 0
+[2026-01-30 12:44:36][INFO] ==================================================
+[2026-01-30 12:44:36][INFO] Importing av (PyAV)...
+[2026-01-30 12:44:36][INFO] PyAV imported OK
+[2026-01-30 12:44:36][INFO] PIL and numpy imported OK
+[2026-01-30 12:44:36][INFO] Opening audio file: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\audio\finding_peace_bednar.mp3
+[2026-01-30 12:44:36][INFO] Audio duration: 70.11s
+[2026-01-30 12:44:36][INFO] Segments in timestamps: 0
+[2026-01-30 12:44:36][INFO] Captions timeline built: 0 words
+[2026-01-30 12:44:36][INFO] Loading character images...
+[2026-01-30 12:44:36][INFO] Looking for image: Analyst -> analyst/close_view (mouth: Open)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\analyst\close_view\CloseMouth_Open.png (exists: False)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\analyst\close_view\CloseMouth_Open.jpeg (exists: True)
+[2026-01-30 12:44:36][INFO]   Loaded: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\analyst\close_view\CloseMouth_Open.jpeg ((3840, 2160))
+[2026-01-30 12:44:36][INFO] Looking for image: Analyst -> analyst/close_view (mouth: Closed)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\analyst\close_view\CloseMouth_Closed.png (exists: False)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\analyst\close_view\CloseMouth_Closed.jpeg (exists: True)
+[2026-01-30 12:44:36][INFO]   Loaded: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\analyst\close_view\CloseMouth_Closed.jpeg ((3840, 2160))
+[2026-01-30 12:44:36][INFO] Loaded images for Analyst: open=True, closed=True
+[2026-01-30 12:44:36][INFO] Looking for image: Skeptic -> skeptic/close_view (mouth: Open)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\skeptic\close_view\CloseMouth_Open.png (exists: False)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\skeptic\close_view\CloseMouth_Open.jpeg (exists: True)
+[2026-01-30 12:44:36][INFO]   Loaded: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\skeptic\close_view\CloseMouth_Open.jpeg ((3840, 2160))
+[2026-01-30 12:44:36][INFO] Looking for image: Skeptic -> skeptic/close_view (mouth: Closed)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\skeptic\close_view\CloseMouth_Closed.png (exists: False)
+[2026-01-30 12:44:36][INFO]   Trying: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\skeptic\close_view\CloseMouth_Closed.jpeg (exists: True)
+[2026-01-30 12:44:37][INFO]   Loaded: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\images\skeptic\close_view\CloseMouth_Closed.jpeg ((3840, 2160))
+[2026-01-30 12:44:37][INFO] Loaded images for Skeptic: open=True, closed=True
+[2026-01-30 12:44:37][INFO] Creating output container: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final.mp4
+[2026-01-30 12:44:37][INFO] Attempting GPU encoding with h264_nvenc...
+[2026-01-30 12:44:37][INFO] GPU encoding enabled: h264_nvenc (preset: p4)
+[2026-01-30 12:44:37][INFO] Video stream: 1080x1920, codec=h264_nvenc, GPU=True
+[2026-01-30 12:44:37][INFO]   Registry: opening -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\1.jpeg
+[2026-01-30 12:44:37][INFO]   Registry: 1a -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\1.jpeg
+[2026-01-30 12:44:37][INFO]   Registry: 2a -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\2.jpeg
+[2026-01-30 12:44:37][INFO]   Registry: 3a -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\3.png
+[2026-01-30 12:44:37][INFO]   Registry: 4a -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\4.jpeg
+[2026-01-30 12:44:37][INFO]   Registry: 5a -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\5.jpeg
+[2026-01-30 12:44:37][INFO]   Registry: 6a -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\6.jpeg
+[2026-01-30 12:44:37][INFO] Image registry loaded: 7 mappings
+[2026-01-30 12:44:37][INFO] Extracting visual assets from 9 dialogue lines
+[2026-01-30 12:44:37][INFO] Image registry has 7 mapped images
+[2026-01-30 12:44:37][INFO]   Opening visual -> C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\1.jpeg (0.0s - 3.0s)
+[2026-01-30 12:44:37][INFO] Total visual assets extracted: 1
+[2026-01-30 12:44:37][INFO] Visual assets extracted from dialogue: 1
+[2026-01-30 12:44:37][INFO] Scheduled floating image 'opening': 0.0s - 3.0s (opening=True)
+[2026-01-30 12:44:37][INFO] Floating image schedule: 1 images
+[2026-01-30 12:44:37][INFO] Loaded floating image: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\images\1.jpeg
+[2026-01-30 12:44:37][INFO] Pre-loaded 1 floating images
+[2026-01-30 12:44:37][INFO] Starting frame render: 2103 frames
+[2026-01-30 12:44:37][INFO] Font loaded: size 67
+[2026-01-30 12:44:37][INFO] Render progress: 0.0% (0/2103)
+[2026-01-30 12:45:23][INFO] Render progress: 7.1% (150/2103)
+[2026-01-30 12:45:59][INFO] Render progress: 14.3% (300/2103)
+[2026-01-30 12:46:34][INFO] Render progress: 21.4% (450/2103)
+[2026-01-30 12:47:09][INFO] Render progress: 28.5% (600/2103)
+[2026-01-30 12:47:44][INFO] Render progress: 35.7% (750/2103)
+[2026-01-30 12:48:20][INFO] Render progress: 42.8% (900/2103)
+[2026-01-30 12:48:55][INFO] Render progress: 49.9% (1050/2103)
+[2026-01-30 12:49:30][INFO] Render progress: 57.1% (1200/2103)
+[2026-01-30 12:50:06][INFO] Render progress: 64.2% (1350/2103)
+[2026-01-30 12:50:41][INFO] Render progress: 71.3% (1500/2103)
+[2026-01-30 12:51:16][INFO] Render progress: 78.5% (1650/2103)
+[2026-01-30 12:51:51][INFO] Render progress: 85.6% (1800/2103)
+[2026-01-30 12:52:26][INFO] Render progress: 92.7% (1950/2103)
+[2026-01-30 12:53:02][INFO] Render progress: 99.9% (2100/2103)
+[2026-01-30 12:53:02][INFO] Flushing video encoder...
+[2026-01-30 12:53:02][INFO] Video container closed
+[2026-01-30 12:53:02][INFO] Adding audio track with FFmpeg...
+[2026-01-30 12:53:02][INFO] File renamed successfully on attempt 1
+[2026-01-30 12:53:02][INFO] Mixing background music: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\audio\music\Frolic-Es-Jammy-Jams.mp3 at volume 0.12
+[2026-01-30 12:53:02][INFO] FFmpeg command: ffmpeg -y -i C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final_temp.mp4 -i C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\audio\finding_peace_bednar.mp3 -stream_loop -1 -i C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\audio\music\Frolic-Es-Jammy-Jams.mp3 -t 71.112625 -filter_complex [1:a]volume=1.0[narration];[2:a]volume=0.12[music];[narration][music]amix=inputs=2:duration=first[aout] -map 0:v -map [aout] -c:v copy -c:a aac -b:a 192k -shortest C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final.mp4
+[2026-01-30 12:54:35][INFO] Temp file cleaned up
+[2026-01-30 12:54:35][INFO] ==================================================
+[2026-01-30 12:54:35][INFO] RENDER COMPLETE: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final.mp4
+[2026-01-30 12:54:35][INFO] Poses used: {'analyst_front'}
+[2026-01-30 12:54:35][INFO] ==================================================
+[2026-01-30 12:54:35][INFO] Render complete. Status: success
+[2026-01-30 12:54:35][INFO] ============================================================
+[2026-01-30 12:54:35][INFO] EXECUTE_RENDER COMPLETED SUCCESSFULLY
+[2026-01-30 12:54:35][INFO] Output: C:\Users\juanf\OneDrive\Escritorio\zero-sum-yt\data\shorts\output\finding_peace_bednar_final.mp4
+[2026-01-30 12:54:35][INFO] ============================================================
